@@ -12,10 +12,10 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation } from '@react-navigation/native';
+
 
 interface VisitorFormData {
   // Personal Information
@@ -46,6 +46,7 @@ interface VisitorFormData {
   emergencyContactNumber: string;
 }
 
+
 const AddVisitor: React.FC = () => {
   const navigation = useNavigation();
   const [formData, setFormData] = useState<VisitorFormData>({
@@ -70,11 +71,14 @@ const AddVisitor: React.FC = () => {
     emergencyContactNumber: '',
   });
 
+
   const [errors, setErrors] = useState<Partial<VisitorFormData>>({});
+
 
   const genderOptions = ['Male', 'Female', 'Other'];
   const purposeOptions = ['Personal Work', 'Business Meeting', 'Delivery', 'Maintenance', 'Interview', 'Other'];
   const relationOptions = ['Father', 'Mother', 'Spouse', 'Sibling', 'Friend', 'Colleague', 'Other'];
+
 
   const updateFormData = (key: keyof VisitorFormData, value: string) => {
     setFormData(prev => ({ ...prev, [key]: value }));
@@ -83,12 +87,14 @@ const AddVisitor: React.FC = () => {
     }
   };
 
+
   const handleImagePicker = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Please grant camera roll permissions to upload photo.');
       return;
     }
+
 
     Alert.alert(
       'Select Photo',
@@ -101,12 +107,14 @@ const AddVisitor: React.FC = () => {
     );
   };
 
+
   const openCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission needed', 'Please grant camera permissions to take photo.');
       return;
     }
+
 
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -115,10 +123,12 @@ const AddVisitor: React.FC = () => {
       quality: 0.8,
     });
 
+
     if (!result.canceled) {
       updateFormData('photo', result.assets[0].uri);
     }
   };
+
 
   const openGallery = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -128,13 +138,16 @@ const AddVisitor: React.FC = () => {
       quality: 0.8,
     });
 
+
     if (!result.canceled) {
       updateFormData('photo', result.assets[0].uri);
     }
   };
 
+
   const validateForm = (): boolean => {
     const newErrors: Partial<VisitorFormData> = {};
+
 
     if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
     if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
@@ -144,11 +157,13 @@ const AddVisitor: React.FC = () => {
     if (!formData.hostName.trim()) newErrors.hostName = 'Host name is required';
     if (!formData.hostUnit.trim()) newErrors.hostUnit = 'Host unit is required';
 
+
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (formData.email && !emailRegex.test(formData.email)) {
       newErrors.email = 'Please enter a valid email';
     }
+
 
     // Phone validation
     const phoneRegex = /^[0-9]{10}$/;
@@ -156,9 +171,11 @@ const AddVisitor: React.FC = () => {
       newErrors.contactNumber = 'Please enter a valid 10-digit phone number';
     }
 
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
 
   const handleSave = () => {
     if (validateForm()) {
@@ -176,6 +193,7 @@ const AddVisitor: React.FC = () => {
       Alert.alert('Error', 'Please fill in all required fields correctly.');
     }
   };
+
 
   const handleReset = () => {
     Alert.alert(
@@ -214,6 +232,7 @@ const AddVisitor: React.FC = () => {
     );
   };
 
+
   const renderInput = (
     key: keyof VisitorFormData,
     label: string,
@@ -243,6 +262,7 @@ const AddVisitor: React.FC = () => {
       {errors[key] && <Text style={styles.errorText}>{errors[key]}</Text>}
     </View>
   );
+
 
   const renderDropdown = (
     key: keyof VisitorFormData,
@@ -276,6 +296,7 @@ const AddVisitor: React.FC = () => {
     </View>
   );
 
+
   const SectionCard = ({ title, children }: { title: string; children: React.ReactNode }) => (
     <View style={styles.sectionCard}>
       <Text style={styles.sectionTitle}>{title}</Text>
@@ -283,22 +304,19 @@ const AddVisitor: React.FC = () => {
     </View>
   );
 
+
   return (
     <SafeAreaView style={styles.container}>
-      <LinearGradient
-        colors={['#146070', '#03C174']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 0 }}
-        style={styles.header}
-      >
+      <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-            <Ionicons name="arrow-back" size={24} color="#fff" />
+            <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Add Visitor</Text>
           <View style={styles.placeholder} />
         </View>
-      </LinearGradient>
+      </View>
+
 
       <KeyboardAvoidingView
         style={styles.keyboardView}
@@ -328,6 +346,7 @@ const AddVisitor: React.FC = () => {
             </View>
           </SectionCard>
 
+
           {/* Personal Information */}
           <SectionCard title="Personal Information">
             {renderInput('firstName', 'First Name', 'Enter first name', true)}
@@ -337,6 +356,7 @@ const AddVisitor: React.FC = () => {
             {renderInput('contactNumber', 'Contact Number', 'Enter contact number', true, false, 'phone-pad')}
             {renderInput('email', 'Email', 'Enter email', true, false, 'email-address')}
           </SectionCard>
+
 
           {/* Identity Documents */}
           <SectionCard title="Identity Documents">
@@ -355,12 +375,14 @@ const AddVisitor: React.FC = () => {
             {renderInput('expectedDuration', 'Expected Duration', 'e.g. 2 hours, Half day', false)}
           </SectionCard>
 
+
           {/* Emergency Contact */}
           <SectionCard title="Emergency Contact">
             {renderInput('emergencyContactName', 'Emergency Contact Name', 'Enter name', false)}
             {renderDropdown('emergencyRelation', 'Relation', relationOptions, false)}
             {renderInput('emergencyContactNumber', 'Emergency Contact Number', 'Enter number', false, false, 'phone-pad')}
           </SectionCard>
+
 
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
@@ -377,6 +399,7 @@ const AddVisitor: React.FC = () => {
   );
 };
 
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -385,6 +408,9 @@ const styles = StyleSheet.create({
   header: {
     paddingVertical: 15,
     paddingHorizontal: 20,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   headerContent: {
     flexDirection: 'row',
@@ -397,7 +423,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
-    color: '#fff',
+    color: '#333',
     flex: 1,
     textAlign: 'center',
   },
@@ -550,5 +576,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
 });
+
 
 export default AddVisitor;

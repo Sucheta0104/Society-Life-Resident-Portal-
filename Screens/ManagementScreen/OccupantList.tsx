@@ -844,7 +844,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 20,
+    borderRadius: 10,
     paddingHorizontal: 12,
     borderWidth: 1,
     borderColor: '#E0E0E0',
@@ -853,7 +853,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-    height: 40,
+    height: 50,
   },
   searchIcon: {
     marginRight: 8,

@@ -756,7 +756,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   addButton: {
-    borderRadius: 20,
+    borderRadius: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: 10,
   },
   addButtonText: {
     color: '#fff',

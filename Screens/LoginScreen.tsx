@@ -16,9 +16,11 @@ import {
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 
+
 interface LoginScreenProps {
   onLoginSuccess: (userInfo: any) => void;
 }
+
 
 const SplashScreen = () => {
   return (
@@ -40,24 +42,16 @@ const SplashScreen = () => {
         />
         <Text style={styles.portalText}>Occupant Portal</Text>
       </View>
-      
-      {/* Loading indicator */}
-      <View style={styles.loadingContainer}>
-        <View style={styles.dots}>
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-          <View style={styles.dot} />
-        </View>
-        <Text style={styles.loadingText}>Loading...</Text>
-      </View>
     </LinearGradient>
   );
 };
+
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   const [userInput, setUserInput] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
 
   const validateForm = () => {
     if (!userInput.trim()) {
@@ -83,6 +77,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     
     return true;
   };
+
 
   const handleLogin = async () => {
     if (!validateForm()) return;
@@ -110,9 +105,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
     }
   };
 
+
   const handleForgotPassword = () => {
     Alert.alert('Forgot Password', 'Password reset link will be sent to your registered email/phone number.');
   };
+
 
   return (
     <View style={styles.loginContainer}>
@@ -178,11 +175,18 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
                 onPress={handleLogin}
                 disabled={isLoading}
               >
-                {isLoading ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.loginSubmitButtonText}>Login to Dashboard</Text>
-                )}
+                <LinearGradient
+                  colors={isLoading ? ['#a0a0a0', '#a0a0a0'] : ['#146070', '#03C174']}
+                  style={styles.loginButtonGradient}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                >
+                  {isLoading ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.loginSubmitButtonText}>Login</Text>
+                  )}
+                </LinearGradient>
               </TouchableOpacity>
               
               {/* Forgot Password */}
@@ -197,9 +201,11 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLoginSuccess }) => {
   );
 };
 
+
 // Export components separately
 export { SplashScreen, LoginScreen };
 export default LoginScreen;
+
 
 const styles = StyleSheet.create({
   // Splash Screen Styles
@@ -239,7 +245,6 @@ const styles = StyleSheet.create({
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 100,
   },
   customLogo: {
     width: 200,
@@ -251,24 +256,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
   },
-  loadingContainer: {
-    alignItems: 'center',
-  },
-  dots: {
-    flexDirection: 'row',
-    marginBottom: 10,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#fff',
-    marginHorizontal: 4,
-  },
-  loadingText: {
-    color: '#fff',
-    fontSize: 16,
-  },
   
   // Login Screen Styles
   loginContainer: {
@@ -276,7 +263,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   loginHeader: {
-    height: '45%',
+    height: '37%',
     width: '100%',
   },
   loginHeaderGradient: {
@@ -287,14 +274,14 @@ const styles = StyleSheet.create({
   },
   loginLogoContainer: {
     alignItems: 'center',
-    marginBottom: 25,
+    marginBottom: 20,
   },
   loginCustomLogo: {
-    width: 180,
-    height: 100,
+    width: 165,
+    height: 90,
   },
   loginPortalTitle: {
-    fontSize: 29,
+    fontSize: 30,
     color: '#fff',
     fontWeight: '600',
     letterSpacing: 0.5,
@@ -302,10 +289,10 @@ const styles = StyleSheet.create({
   loginFormSection: {
     flex: 1,
     backgroundColor: '#fff',
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
     marginTop: -25,
-    paddingTop: 40,
+    paddingTop: 30,
     paddingHorizontal: 30,
     shadowColor: '#000',
     shadowOffset: {
@@ -323,20 +310,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   loginInputGroup: {
-    marginBottom: 28,
+    marginBottom: 15,
   },
   loginLabel: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
     color: '#2c3e50',
     marginBottom: 10,
   },
   loginInput: {
-    borderWidth: 1.5,
+    borderWidth: 1,
     borderColor: '#e1e8ed',
     borderRadius: 12,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12, 
+    
     fontSize: 16,
     backgroundColor: '#fff',
     color: '#2c3e50',
@@ -348,41 +336,44 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 2,
     elevation: 2,
+    height: 50, 
   },
   loginSubmitButton: {
-    backgroundColor: '#05ae74',
-    paddingVertical: 18,
     borderRadius: 12,
-    alignItems: 'center',
     marginTop: 15,
-    marginBottom: 25,
-    shadowColor: '#05ae74',
+    marginBottom: 20,
+    overflow: 'hidden', 
+    shadowColor: '#146070',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 3, 
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  loginButtonGradient: {
+    paddingVertical: 14, 
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   loginSubmitButtonDisabled: {
-    backgroundColor: '#a0a0a0',
     shadowOpacity: 0,
     elevation: 0,
   },
   loginSubmitButtonText: {
     color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
+    fontSize: 17, 
+    fontWeight: '700',
     letterSpacing: 0.5,
   },
   forgotPasswordContainer: {
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: 2,
   },
   loginForgotPasswordText: {
     color: '#03c174',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '500',
     textDecorationLine: 'underline',
   },

@@ -1777,7 +1777,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   viewMoreButton: {
-    borderWidth: 1,
+    borderWidth: 0.5,
     borderColor: '#1a9b8a',
     paddingVertical: 11,
     borderRadius: 9,

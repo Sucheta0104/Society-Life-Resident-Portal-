@@ -75,12 +75,12 @@ const ManagementHub = () => {
   try {
     setLoading(true);
 
-    const valuesString = `@p_Unit_Id=${280},@p_Society_Id=NULL,@p_Block_Id=NULL,@p_Floor=NULL,@p_Society_GUID=NULL,@p_Unit_Type_Id=NULL,@p_Unit_Name=NULL,@p_Builtup_Area=NULL,@p_Carpet_Area=NULL,@p_Super_Built_Area=NULL,@p_Number_Of_Room=NULL,@p_Number_Of_Bathroom=NULL,@p_Number_Of_Balcony=NULL,@p_Contact_Number=NULL,@p_Current_Occupancy_Type_Id=NULL,@p_Unit_Status_Id=NULL,@p_Attribute1=NULL,@p_Attribute2=NULL,@p_Attribute3=NULL,@p_Attribute4=NULL,@p_Attribute5=NULL,@p_Attribute6=NULL,@p_Attribute7=NULL,@p_Attribute8=NULL,@p_Attribute9=NULL,@p_Attribute10=NULL,@p_Is_Active=1,@p_Is_Archived=0,@p_Skip=0,@p_Take=10,@p_First_Name=NULL,@p_Is_Primary=NULL,@p_Email=NULL`;
+    const valuesString = `@SocietId=7,@Society_Guid=NULL`;
 
     const requestBody = new URLSearchParams({
       AuthKey: API_CONFIG.authKey,
       HostKey: API_CONFIG.hostKey,
-      Object: 'UNM_SP_Unit_Get',
+      Object: 'UNM_SP_CSTMZ_Total_Count_get_NEW',
       Values: valuesString,
     }).toString();
 
@@ -104,38 +104,46 @@ const ManagementHub = () => {
       throw e;
     }
 
-    // Adjust this path according to your API’s actual structure
-    const totalUnit =
-      result?.overview?.totalUnit ??
-      result?.data?.totalUnit ??
-      result?.count ??
-      0;
+    // ✅ Safely get the first record
+    const data =
+      result?.Data && Array.isArray(result.Data) && result.Data.length > 0
+        ? result.Data[0]
+        : null;
+
+    if (!data) {
+      console.warn('No data found from API');
+      setManagementData(null);
+      return;
+    }
 
     setManagementData({
       overview: {
-        totalUnit,
-        totalOccupants: 0,
-        occupancyRate: 0,
+        totalUnit: data.Total_Units ?? 0,
+        totalOccupants: data.Total_Occupants ?? 0,
+        occupancyRate: data.Occupancy_Rate ?? 0,
       },
       unitManagement: {
-        total: totalUnit,
-        occupied: 0,
-        vacant: 0,
+        total: data.Total_Units ?? 0,
+        occupied:
+          (data.Total_Units ?? 0) - (data.Vacant_Units ?? 0),
+        vacant: data.Vacant_Units ?? 0,
       },
       ownerManagement: {
-        total: 0,
-        active: 0,
-        inactive: 0,
+        total: data.Total_Owners ?? 0,
+        active: data.Active_Owners ?? 0,
+        inactive: data.Inactive_Owners ?? 0,
       },
       tenantManagement: {
-        total: 0,
-        active: 0,
-        pending: 0,
+        total: data.Total_Tenants ?? 0,
+        active: data.Active_Tenants ?? 0,
+        pending: data.Inactive_Tenants ?? 0,
       },
       occupantManagement: {
-        total: 0,
-        primary: 0,
-        secondary: 0,
+        total:
+          (data.Primary_Occupants ?? 0) +
+          (data.Secondary_Occupants ?? 0),
+        primary: data.Primary_Occupants ?? 0,
+        secondary: data.Secondary_Occupants ?? 0,
       },
     });
   } catch (error) {
@@ -144,6 +152,7 @@ const ManagementHub = () => {
     setLoading(false);
   }
 };
+
 
 
   // Navigation functions - replace with actual navigation logic
@@ -292,7 +301,7 @@ const ManagementHub = () => {
           stats={[
             { value: managementData.tenantManagement.total, label: 'Total' },
             { value: managementData.tenantManagement.active, label: 'Active' },
-            { value: managementData.tenantManagement.pending, label: 'Pending' }
+            { value: managementData.tenantManagement.pending, label: 'Inactive' }
           ]}
           onPress={() => navigation.navigate("TenantManagement" as never)}
           // showPlus={true}
@@ -364,7 +373,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   overviewNumber: {
-    fontSize: 32,
+    fontSize: 23,
     fontWeight: 'bold',
     color: '#146070',
     marginBottom: 6,

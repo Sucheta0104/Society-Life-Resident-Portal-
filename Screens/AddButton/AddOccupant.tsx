@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,9 @@ import {
   Image,
   Alert,
   Platform,
+  ActivityIndicator,
+  Modal,
+  Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -18,6 +21,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { ReactNode } from 'react';
 import { useNavigation } from '@react-navigation/native';
 
+const { width: screenWidth } = Dimensions.get('window');
+
+// API Configuration
+const API_CONFIG = {
+  baseUrl: 'https://applianceservicemgmt.dev2stage.in/api/rest/Invoke',
+  authKey: '86A264E4-ECF8-4627-AF83-5512FE83DAE6',
+  hostKey: '8ECB211D2',
+  storeProcedure: 'CMN_SP_Generic_DropdownList_Get',
+  timeout: 10000
+};
+
 const statesOfIndia = [
   'Andhra Pradesh', 'Arunachal Pradesh', 'Assam', 'Bihar', 'Chhattisgarh', 'Goa', 'Gujarat',
   'Haryana', 'Himachal Pradesh', 'Jharkhand', 'Karnataka', 'Kerala', 'Madhya Pradesh', 'Maharashtra',
@@ -26,6 +40,12 @@ const statesOfIndia = [
   'Andaman and Nicobar Islands', 'Chandigarh', 'Dadra and Nagar Haveli', 'Daman and Diu',
   'Delhi', 'Jammu and Kashmir', 'Ladakh', 'Lakshadweep', 'Puducherry'
 ];
+
+// Types
+interface DropdownOption {
+  Text: string;
+  Value: string;
+}
 
 const AddOccupant = () => {
   const navigation = useNavigation();
@@ -49,11 +69,20 @@ const AddOccupant = () => {
     relationWithPrimary: '',
     isPrimaryOccupant: 'No',
   });
+  
   const [profileImage, setProfileImage] = useState<string | null>(null);
-
   const [showDOBPicker, setShowDOBPicker] = useState(false);
   const [showEffectiveDatePicker, setShowEffectiveDatePicker] = useState(false);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  
+  // Static gender options - fully functional without API
+  const [genderOptions] = useState<DropdownOption[]>([
+    { Text: 'Male', Value: '8' },
+    { Text: 'Female', Value: '9' },
+    { Text: 'Others', Value: '10' },
+  ]);
 
+  // Types
   type FormCardProps = {
     title?: string;
     children?: ReactNode;
@@ -66,6 +95,16 @@ const AddOccupant = () => {
     onChangeText: (text: string) => void;
     placeholder?: string;
     keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
+  };
+
+  type ApiPickerFieldProps = {
+    label: string;
+    required?: boolean;
+    selectedValue: string;
+    onValueChange: (value: string, index: number) => void;
+    options: DropdownOption[];
+    placeholder: string;
+    loading?: boolean;
   };
 
   type PickerFieldProps = {
@@ -83,10 +122,9 @@ const AddOccupant = () => {
     onPress: () => void;
   };
 
-  const formatDate = (date: Date): string => {
-    const d = new Date(date);
-    let day: string = d.getDate().toString().padStart(2, "0");
-    let month: string = (d.getMonth() + 1).toString().padStart(2, "0");
+  const formatDate = (d: Date) => {
+    const day = d.getDate().toString().padStart(2, '0');
+    const month = (d.getMonth() + 1).toString().padStart(2, '0');
     const year = d.getFullYear();
     return `${day}-${month}-${year}`;
   };
@@ -108,10 +146,12 @@ const AddOccupant = () => {
   };
 
   const updateFormData = (field: string, value: string) => {
+    console.log(`📝 Updating ${field}:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
   const pickImage = async () => {
+    setShowImagePickerModal(false);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Permission to access camera roll is required!');
@@ -127,6 +167,7 @@ const AddOccupant = () => {
   };
 
   const takePhoto = async () => {
+    setShowImagePickerModal(false);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
       Alert.alert('Permission required', 'Permission to access camera is required!');
@@ -141,48 +182,227 @@ const AddOccupant = () => {
   };
 
   const showImagePicker = () => {
+    setShowImagePickerModal(true);
+  };
+
+  // Custom Image Picker Modal Component
+  const ImagePickerModal = () => (
+    <Modal
+      visible={showImagePickerModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={() => setShowImagePickerModal(false)}
+    >
+      <View style={modalStyles.overlay}>
+        <View style={modalStyles.container}>
+          <View style={modalStyles.header}>
+            <Text style={modalStyles.title}>Select Option</Text>
+          </View>
+          
+          <View style={modalStyles.optionsContainer}>
+            <TouchableOpacity 
+              style={modalStyles.option}
+              onPress={takePhoto}
+              activeOpacity={0.7}
+            >
+              <View style={modalStyles.iconContainer}>
+                <Ionicons name="camera" size={24} color="#146070" />
+              </View>
+              <Text style={modalStyles.optionText}>Take Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={modalStyles.option}
+              onPress={pickImage}
+              activeOpacity={0.7}
+            >
+              <View style={modalStyles.iconContainer}>
+                <Ionicons name="images" size={24} color="#146070" />
+              </View>
+              <Text style={modalStyles.optionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={modalStyles.option}
+              onPress={() => {
+                // Add document picker functionality here if needed
+                setShowImagePickerModal(false);
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={modalStyles.iconContainer}>
+                <Ionicons name="document" size={24} color="#146070" />
+              </View>
+              <Text style={modalStyles.optionText}>Pick Document</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={modalStyles.cancelButton}
+            onPress={() => setShowImagePickerModal(false)}
+            activeOpacity={0.7}
+          >
+            <Text style={modalStyles.cancelButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const validateForm = () => {
+    const requiredFields = [
+      { field: 'firstName', label: 'First Name' },
+      { field: 'lastName', label: 'Last Name' },
+      { field: 'gender', label: 'Gender' },
+      { field: 'dateOfBirth', label: 'Date of Birth' },
+      { field: 'contactNumber', label: 'Contact Number' },
+      { field: 'email', label: 'Email' },
+      { field: 'aadharNumber', label: 'Aadhar Number' },
+      { field: 'panNumber', label: 'PAN Number' },
+      { field: 'country', label: 'Country' },
+      { field: 'state', label: 'State' },
+      { field: 'unit', label: 'Unit' },
+      { field: 'occupantType', label: 'Occupant Type' },
+    ];
+
+    for (const { field, label } of requiredFields) {
+      if (!formData[field as keyof typeof formData]) {
+        Alert.alert('Validation Error', `${label} is required`);
+        return false;
+      }
+    }
+
+    if (!profileImage) {
+      Alert.alert('Validation Error', 'Please upload a photo');
+      return false;
+    }
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      Alert.alert('Validation Error', 'Please enter a valid email address');
+      return false;
+    }
+
+    // Phone validation
+    if (formData.contactNumber.length !== 10) {
+      Alert.alert('Validation Error', 'Contact number must be 10 digits');
+      return false;
+    }
+
+    // Aadhar validation
+    if (formData.aadharNumber.replace(/\s/g, '').length !== 12) {
+      Alert.alert('Validation Error', 'Aadhar number must be 12 digits');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSave = () => {
+    if (!validateForm()) {
+      return;
+    }
+
+    const selectedGender = genderOptions.find(option => option.Value === formData.gender);
+    
+    const formDataToSave = {
+      ...formData,
+      genderText: selectedGender?.Text || 'Not selected',
+      genderId: formData.gender,
+      profileImageUri: profileImage,
+      submittedAt: new Date().toISOString(),
+    };
+    
+    console.log('💾 Complete Form Data to Save:', JSON.stringify(formDataToSave, null, 2));
+    
     Alert.alert(
-      'Select Photo',
-      'Choose from where you want to select a photo',
+      'Success', 
+      'Occupant details saved successfully!\n\nData has been prepared for backend submission.', 
       [
-        { text: 'Camera', onPress: takePhoto },
-        { text: 'Gallery', onPress: pickImage },
-        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'View Data',
+          onPress: () => {
+            Alert.alert(
+              'Saved Data Preview',
+              `Name: ${formData.firstName} ${formData.lastName}\nGender: ${selectedGender?.Text}\nEmail: ${formData.email}\nPhone: ${formData.contactNumber}`,
+              [{ text: 'OK' }]
+            );
+          }
+        },
+        {
+          text: 'OK',
+          onPress: () => {
+            console.log('✅ Form submission completed successfully');
+          }
+        }
       ]
     );
   };
 
-  const handleSave = () => {
-    console.log('Form Data:', formData);
-    console.log('Profile Image:', profileImage);
-    Alert.alert('Success', 'Occupant details saved successfully!');
-  };
-
   const handleReset = () => {
-    setFormData({
-      firstName: '',
-      lastName: '',
-      gender: '',
-      dateOfBirth: '',
-      contactNumber: '',
-      email: '',
-      aadharNumber: '',
-      panNumber: '',
-      country: '',
-      state: '',
-      pinCode: '',
-      address: '',
-      unit: '',
-      occupantType: '',
-      effectiveStartDate: '',
-      relationWithPrimary: '',
-      isPrimaryOccupant: 'No',
-    });
-    setProfileImage(null);
+    Alert.alert(
+      'Reset Form',
+      'Are you sure you want to reset all fields? This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            console.log('🔄 Resetting form data');
+            setFormData({
+              firstName: '',
+              lastName: '',
+              gender: '',
+              dateOfBirth: '',
+              contactNumber: '',
+              email: '',
+              aadharNumber: '',
+              panNumber: '',
+              country: '',
+              state: '',
+              pinCode: '',
+              address: '',
+              unit: '',
+              occupantType: '',
+              effectiveStartDate: '',
+              relationWithPrimary: '',
+              isPrimaryOccupant: 'No',
+            });
+            setProfileImage(null);
+          },
+        },
+      ]
+    );
   };
 
   const handleBack = () => {
-    navigation.goBack();
+    if (Object.values(formData).some(value => value !== '' && value !== 'No') || profileImage) {
+      Alert.alert(
+        'Unsaved Changes',
+        'You have unsaved changes. Are you sure you want to go back?',
+        [
+          {
+            text: 'Stay',
+            style: 'cancel',
+          },
+          {
+            text: 'Go Back',
+            style: 'destructive',
+            onPress: () => {
+              console.log('⬅️ Navigating back with confirmation');
+              navigation.goBack();
+            },
+          },
+        ]
+      );
+    } else {
+      navigation.goBack();
+    }
   };
 
   // Reusable components
@@ -217,6 +437,43 @@ const AddOccupant = () => {
         autoComplete="off"
         textContentType="none"
       />
+    </View>
+  );
+
+  const ApiPickerField: React.FC<ApiPickerFieldProps> = ({
+    label,
+    required = false,
+    selectedValue,
+    onValueChange,
+    options,
+    placeholder,
+    loading = false,
+  }) => (
+    <View style={styles.inputContainer}>
+      <Text style={styles.label}>
+        {label} {required && <Text style={styles.required}>*</Text>}
+      </Text>
+      <View style={styles.pickerContainer}>
+        <Picker
+          selectedValue={selectedValue}
+          style={styles.picker}
+          onValueChange={(value) => {
+            console.log(`🎯 ${label} selected:`, value, options.find(o => o.Value === value)?.Text);
+            onValueChange(value, 0);
+          }}
+          itemStyle={styles.pickerItem}
+        >
+          <Picker.Item label={placeholder} value="" style={styles.pickerItem} />
+          {options.map((option, i) => (
+            <Picker.Item 
+              key={i} 
+              label={option.Text} 
+              value={option.Value} 
+              style={styles.pickerItem} 
+            />
+          ))}
+        </Picker>
+      </View>
     </View>
   );
 
@@ -257,7 +514,10 @@ const AddOccupant = () => {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps='handled'>
-      {/* Updated Header with Back Button */}
+      {/* Custom Image Picker Modal */}
+      <ImagePickerModal />
+      
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
           <Ionicons name="arrow-back" size={24} color="#00A86B" />
@@ -296,13 +556,15 @@ const AddOccupant = () => {
           onChangeText={(text) => updateFormData('lastName', text)} 
           placeholder="Doe" 
         />
-        <PickerField 
+        
+        <ApiPickerField 
           label="Gender" 
           required 
           selectedValue={formData.gender} 
           onValueChange={(value) => updateFormData('gender', value)} 
           placeholder="Select Gender" 
-          items={['Male', 'Female', 'Other']} 
+          options={genderOptions}
+          loading={false}
         />
 
         {/* Date of Birth with picker */}
@@ -317,7 +579,7 @@ const AddOccupant = () => {
             </View>
           </TouchableOpacity>
           {showDOBPicker && <DateTimePicker
-            value={formData.dateOfBirth ? new Date(formData.dateOfBirth.split('-').reverse().join('-')) : new Date(2000,0,1)}
+            value={formData.dateOfBirth ? new Date(formData.dateOfBirth.split('/').reverse().join('-')) : new Date(2000,0,1)}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={onDOBChange}
@@ -418,7 +680,6 @@ const AddOccupant = () => {
           items={['Tenant', 'Owner', 'Guest']} 
         />
 
-        {/* Effective Start Date with picker */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Effective Start Date</Text>
           <TouchableOpacity onPress={() => setShowEffectiveDatePicker(true)} activeOpacity={0.7}>
@@ -430,7 +691,7 @@ const AddOccupant = () => {
             </View>
           </TouchableOpacity>
           {showEffectiveDatePicker && <DateTimePicker
-            value={formData.effectiveStartDate ? new Date(formData.effectiveStartDate.split('-').reverse().join('-')) : new Date()}
+            value={formData.effectiveStartDate ? new Date(formData.effectiveStartDate.split('/').reverse().join('-')) : new Date()}
             mode="date"
             display={Platform.OS === 'ios' ? 'spinner' : 'default'}
             onChange={onEffectiveDateChange}
@@ -472,6 +733,7 @@ const AddOccupant = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
+            <Ionicons name="refresh" size={16} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.resetButtonText}>Reset</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -483,6 +745,7 @@ const AddOccupant = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
+            <Ionicons name="checkmark" size={16} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.saveButtonText}>Save</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -492,6 +755,82 @@ const AddOccupant = () => {
     </ScrollView>
   );
 };
+
+// Modal Styles
+const modalStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  container: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    width: screenWidth * 0.85,
+    maxWidth: 400,
+    paddingVertical: 20,
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+  },
+  header: {
+    alignItems: 'center',
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333333',
+  },
+  optionsContainer: {
+    paddingHorizontal: 20,
+  },
+  option: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#e8f5f3',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 15,
+  },
+  optionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333333',
+    flex: 1,
+  },
+  cancelButton: {
+    marginTop: 10,
+    marginHorizontal: 20,
+    paddingVertical: 15,
+    alignItems: 'center',
+    backgroundColor: '#ffe6e6',
+    borderRadius: 12,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#dc3545',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {
@@ -676,7 +1015,9 @@ const styles = StyleSheet.create({
   gradientButton: {
     padding: 16,
     alignItems: 'center',
+    justifyContent: 'center',
     borderRadius: 8,
+    flexDirection: 'row',
   },
   resetButtonText: {
     color: '#FFFFFF',
