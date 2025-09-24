@@ -7,11 +7,11 @@ import {
   ScrollView,
   StyleSheet,
   Image,
-  Alert,
   Platform,
   ActivityIndicator,
   Modal,
   Dimensions,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -75,12 +75,414 @@ const AddOccupant = () => {
   const [showEffectiveDatePicker, setShowEffectiveDatePicker] = useState(false);
   const [showImagePickerModal, setShowImagePickerModal] = useState(false);
   
+  // Custom Modal States
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [showBackModal, setShowBackModal] = useState(false);
+  
+  // Animation Values
+  const [successAnimation] = useState(new Animated.Value(0));
+  const [errorAnimation] = useState(new Animated.Value(0));
+  const [infoAnimation] = useState(new Animated.Value(0));
+  const [resetAnimation] = useState(new Animated.Value(0));
+  const [backAnimation] = useState(new Animated.Value(0));
+  
+  // Modal Data
+  const [modalData, setModalData] = useState({ title: '', message: '' });
+  
   // Static gender options - fully functional without API
   const [genderOptions] = useState<DropdownOption[]>([
     { Text: 'Male', Value: '8' },
     { Text: 'Female', Value: '9' },
     { Text: 'Others', Value: '10' },
   ]);
+
+  // Custom Modal Functions
+  const showCustomSuccess = (title: string, message: string) => {
+    setModalData({ title, message });
+    setShowSuccessModal(true);
+    Animated.sequence([
+      Animated.timing(successAnimation, {
+        toValue: 1,
+        duration: 500,
+        useNativeDriver: true,
+      }),
+      Animated.timing(successAnimation, {
+        toValue: 0,
+        duration: 500,
+        delay: 3000, // Display for 3 seconds
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowSuccessModal(false);
+    });
+  };
+
+  const showCustomError = (title: string, message: string) => {
+    setModalData({ title, message });
+    setShowErrorModal(true);
+    Animated.sequence([
+      Animated.timing(errorAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const showCustomInfo = (title: string, message: string) => {
+    setModalData({ title, message });
+    setShowInfoModal(true);
+    Animated.sequence([
+      Animated.timing(infoAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const showResetConfirmation = () => {
+    setShowResetModal(true);
+    Animated.sequence([
+      Animated.timing(resetAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const showBackConfirmation = () => {
+    setShowBackModal(true);
+    Animated.sequence([
+      Animated.timing(backAnimation, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  // Success Modal Component
+  const SuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowSuccessModal(false)}
+    >
+      <View style={modalStyles.successOverlay}>
+        <Animated.View
+          style={[
+            modalStyles.successContent,
+            {
+              opacity: successAnimation,
+              transform: [
+                {
+                  scale: successAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#146070', '#03C174']}
+            style={modalStyles.successGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={modalStyles.successCheckContainer}>
+              <Ionicons name="checkmark-circle" size={80} color="white" />
+            </View>
+            <Text style={modalStyles.successTitle}>{modalData.title}</Text>
+            <Text style={modalStyles.successMessage}>{modalData.message}</Text>
+          </LinearGradient>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  // Error Modal Component
+  const ErrorModal = () => (
+    <Modal
+      visible={showErrorModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        Animated.timing(errorAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          setShowErrorModal(false);
+        });
+      }}
+    >
+      <View style={modalStyles.errorOverlay}>
+        <Animated.View
+          style={[
+            modalStyles.errorContent,
+            {
+              opacity: errorAnimation,
+              transform: [
+                {
+                  scale: errorAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#e74c3c', '#c0392b']}
+            style={modalStyles.errorGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={modalStyles.errorIconContainer}>
+              <Ionicons name="close-circle" size={80} color="white" />
+            </View>
+            <Text style={modalStyles.errorTitle}>{modalData.title}</Text>
+            <Text style={modalStyles.errorMessage}>{modalData.message}</Text>
+            <TouchableOpacity
+              style={modalStyles.errorButton}
+              onPress={() => {
+                Animated.timing(errorAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+                  setShowErrorModal(false);
+                });
+              }}
+            >
+              <Text style={modalStyles.errorButtonText}>OK</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  // Info Modal Component
+  const InfoModal = () => (
+    <Modal
+      visible={showInfoModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        Animated.timing(infoAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          setShowInfoModal(false);
+        });
+      }}
+    >
+      <View style={modalStyles.infoOverlay}>
+        <Animated.View
+          style={[
+            modalStyles.infoContent,
+            {
+              opacity: infoAnimation,
+              transform: [
+                {
+                  scale: infoAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#3498db', '#2980b9']}
+            style={modalStyles.infoGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={modalStyles.infoIconContainer}>
+              <Ionicons name="information-circle" size={80} color="white" />
+            </View>
+            <Text style={modalStyles.infoTitle}>{modalData.title}</Text>
+            <Text style={modalStyles.infoMessage}>{modalData.message}</Text>
+            <TouchableOpacity
+              style={modalStyles.infoButton}
+              onPress={() => {
+                Animated.timing(infoAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+                  setShowInfoModal(false);
+                });
+              }}
+            >
+              <Text style={modalStyles.infoButtonText}>OK</Text>
+            </TouchableOpacity>
+          </LinearGradient>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  // Reset Confirmation Modal Component
+  const ResetModal = () => (
+    <Modal
+      visible={showResetModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        Animated.timing(resetAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          setShowResetModal(false);
+        });
+      }}
+    >
+      <View style={modalStyles.resetOverlay}>
+        <Animated.View
+          style={[
+            modalStyles.resetContent,
+            {
+              opacity: resetAnimation,
+              transform: [
+                {
+                  scale: resetAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#f39c12', '#e67e22']}
+            style={modalStyles.resetGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={modalStyles.resetIconContainer}>
+              <Ionicons name="warning" size={80} color="white" />
+            </View>
+            <Text style={modalStyles.resetTitle}>Reset Form</Text>
+            <Text style={modalStyles.resetMessage}>
+              Are you sure you want to reset all fields? This action cannot be undone.
+            </Text>
+            <View style={modalStyles.resetButtonContainer}>
+              <TouchableOpacity
+                style={[modalStyles.resetModalButton, modalStyles.cancelButton]}
+                onPress={() => {
+                  Animated.timing(resetAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+                    setShowResetModal(false);
+                  });
+                }}
+              >
+                <Text style={modalStyles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[modalStyles.resetModalButton, modalStyles.confirmButton]}
+                onPress={() => {
+                  Animated.timing(resetAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+                    setShowResetModal(false);
+                    // Reset form
+                    console.log('🔄 Resetting form data');
+                    setFormData({
+                      firstName: '',
+                      lastName: '',
+                      gender: '',
+                      dateOfBirth: '',
+                      contactNumber: '',
+                      email: '',
+                      aadharNumber: '',
+                      panNumber: '',
+                      country: '',
+                      state: '',
+                      pinCode: '',
+                      address: '',
+                      unit: '',
+                      occupantType: '',
+                      effectiveStartDate: '',
+                      relationWithPrimary: '',
+                      isPrimaryOccupant: 'No',
+                    });
+                    setProfileImage(null);
+                  });
+                }}
+              >
+                <Text style={modalStyles.confirmButtonText}>Reset</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  // Back Confirmation Modal Component
+  const BackModal = () => (
+    <Modal
+      visible={showBackModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        Animated.timing(backAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+          setShowBackModal(false);
+        });
+      }}
+    >
+      <View style={modalStyles.backOverlay}>
+        <Animated.View
+          style={[
+            modalStyles.backContent,
+            {
+              opacity: backAnimation,
+              transform: [
+                {
+                  scale: backAnimation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.3, 1],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          <LinearGradient
+            colors={['#f39c12', '#e67e22']}
+            style={modalStyles.backGradient}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+          >
+            <View style={modalStyles.backIconContainer}>
+              <Ionicons name="warning" size={80} color="white" />
+            </View>
+            <Text style={modalStyles.backTitle}>Unsaved Changes</Text>
+            <Text style={modalStyles.backMessage}>
+              You have unsaved changes. Are you sure you want to go back?
+            </Text>
+            <View style={modalStyles.backButtonContainer}>
+              <TouchableOpacity
+                style={[modalStyles.backModalButton, modalStyles.stayButton]}
+                onPress={() => {
+                  Animated.timing(backAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+                    setShowBackModal(false);
+                  });
+                }}
+              >
+                <Text style={modalStyles.stayButtonText}>Stay</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[modalStyles.backModalButton, modalStyles.goBackButton]}
+                onPress={() => {
+                  Animated.timing(backAnimation, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => {
+                    setShowBackModal(false);
+                    console.log('⬅️ Navigating back with confirmation');
+                    navigation.goBack();
+                  });
+                }}
+              >
+                <Text style={modalStyles.goBackButtonText}>Go Back</Text>
+              </TouchableOpacity>
+            </View>
+          </LinearGradient>
+        </Animated.View>
+      </View>
+    </Modal>
+  );
 
   // Types
   type FormCardProps = {
@@ -145,6 +547,7 @@ const AddOccupant = () => {
     setShowEffectiveDatePicker(false);
   };
 
+  // Fixed updateFormData function - direct state update
   const updateFormData = (field: string, value: string) => {
     console.log(`📝 Updating ${field}:`, value);
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -154,7 +557,7 @@ const AddOccupant = () => {
     setShowImagePickerModal(false);
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Permission to access camera roll is required!');
+      showCustomError('Permission required', 'Permission to access camera roll is required!');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -170,7 +573,7 @@ const AddOccupant = () => {
     setShowImagePickerModal(false);
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permission required', 'Permission to access camera is required!');
+      showCustomError('Permission required', 'Permission to access camera is required!');
       return;
     }
     const result = await ImagePicker.launchCameraAsync({
@@ -267,32 +670,32 @@ const AddOccupant = () => {
 
     for (const { field, label } of requiredFields) {
       if (!formData[field as keyof typeof formData]) {
-        Alert.alert('Validation Error', `${label} is required`);
+        showCustomError('Validation Error', `${label} is required`);
         return false;
       }
     }
 
     if (!profileImage) {
-      Alert.alert('Validation Error', 'Please upload a photo');
+      showCustomError('Validation Error', 'Please upload a photo');
       return false;
     }
 
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
-      Alert.alert('Validation Error', 'Please enter a valid email address');
+      showCustomError('Validation Error', 'Please enter a valid email address');
       return false;
     }
 
     // Phone validation
     if (formData.contactNumber.length !== 10) {
-      Alert.alert('Validation Error', 'Contact number must be 10 digits');
+      showCustomError('Validation Error', 'Contact number must be 10 digits');
       return false;
     }
 
     // Aadhar validation
     if (formData.aadharNumber.replace(/\s/g, '').length !== 12) {
-      Alert.alert('Validation Error', 'Aadhar number must be 12 digits');
+      showCustomError('Validation Error', 'Aadhar number must be 12 digits');
       return false;
     }
 
@@ -316,90 +719,20 @@ const AddOccupant = () => {
     
     console.log('💾 Complete Form Data to Save:', JSON.stringify(formDataToSave, null, 2));
     
-    Alert.alert(
-      'Success', 
-      'Occupant details saved successfully!\n\nData has been prepared for backend submission.', 
-      [
-        {
-          text: 'View Data',
-          onPress: () => {
-            Alert.alert(
-              'Saved Data Preview',
-              `Name: ${formData.firstName} ${formData.lastName}\nGender: ${selectedGender?.Text}\nEmail: ${formData.email}\nPhone: ${formData.contactNumber}`,
-              [{ text: 'OK' }]
-            );
-          }
-        },
-        {
-          text: 'OK',
-          onPress: () => {
-            console.log('✅ Form submission completed successfully');
-          }
-        }
-      ]
+    // Show success modal instead of Alert
+    showCustomSuccess(
+      'Success!', 
+      `Occupant "${formData.firstName} ${formData.lastName}" has been added successfully`
     );
   };
 
   const handleReset = () => {
-    Alert.alert(
-      'Reset Form',
-      'Are you sure you want to reset all fields? This action cannot be undone.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Reset',
-          style: 'destructive',
-          onPress: () => {
-            console.log('🔄 Resetting form data');
-            setFormData({
-              firstName: '',
-              lastName: '',
-              gender: '',
-              dateOfBirth: '',
-              contactNumber: '',
-              email: '',
-              aadharNumber: '',
-              panNumber: '',
-              country: '',
-              state: '',
-              pinCode: '',
-              address: '',
-              unit: '',
-              occupantType: '',
-              effectiveStartDate: '',
-              relationWithPrimary: '',
-              isPrimaryOccupant: 'No',
-            });
-            setProfileImage(null);
-          },
-        },
-      ]
-    );
+    showResetConfirmation();
   };
 
   const handleBack = () => {
     if (Object.values(formData).some(value => value !== '' && value !== 'No') || profileImage) {
-      Alert.alert(
-        'Unsaved Changes',
-        'You have unsaved changes. Are you sure you want to go back?',
-        [
-          {
-            text: 'Stay',
-            style: 'cancel',
-          },
-          {
-            text: 'Go Back',
-            style: 'destructive',
-            onPress: () => {
-              console.log('⬅️ Navigating back with confirmation');
-              navigation.goBack();
-            },
-          },
-        ]
-      );
+      showBackConfirmation();
     } else {
       navigation.goBack();
     }
@@ -413,6 +746,7 @@ const AddOccupant = () => {
     </View>
   );
 
+  // Fixed InputField component - using direct field updates
   const InputField: React.FC<InputFieldProps> = ({
     label,
     required = false,
@@ -420,25 +754,27 @@ const AddOccupant = () => {
     onChangeText,
     placeholder,
     keyboardType = "default",
-  }) => (
-    <View style={styles.inputContainer}>
-      <Text style={styles.label}>
-        {label} {required && <Text style={styles.required}>*</Text>}
-      </Text>
-      <TextInput
-        style={styles.input}
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        keyboardType={keyboardType}
-        maxLength={keyboardType === "phone-pad" ? 10 : undefined}
-        placeholderTextColor="#999"
-        autoCorrect={false}
-        autoComplete="off"
-        textContentType="none"
-      />
-    </View>
-  );
+  }) => {
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>
+          {label} {required && <Text style={styles.required}>*</Text>}
+        </Text>
+        <TextInput
+          style={styles.input}
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          keyboardType={keyboardType}
+          maxLength={keyboardType === "phone-pad" ? 10 : undefined}
+          placeholderTextColor="#999"
+          autoCorrect={false}
+          autoComplete="off"
+          textContentType="none"
+        />
+      </View>
+    );
+  };
 
   const ApiPickerField: React.FC<ApiPickerFieldProps> = ({
     label,
@@ -517,6 +853,13 @@ const AddOccupant = () => {
       {/* Custom Image Picker Modal */}
       <ImagePickerModal />
       
+      {/* Custom Alert Modals */}
+      <SuccessModal />
+      <ErrorModal />
+      <InfoModal />
+      <ResetModal />
+      <BackModal />
+      
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton} activeOpacity={0.7}>
@@ -546,14 +889,14 @@ const AddOccupant = () => {
           label="First Name" 
           required 
           value={formData.firstName} 
-          onChangeText={(text) => updateFormData('firstName', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, firstName: text }))} 
           placeholder="John" 
         />
         <InputField 
           label="Last Name" 
           required 
           value={formData.lastName} 
-          onChangeText={(text) => updateFormData('lastName', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, lastName: text }))} 
           placeholder="Doe" 
         />
         
@@ -561,7 +904,7 @@ const AddOccupant = () => {
           label="Gender" 
           required 
           selectedValue={formData.gender} 
-          onValueChange={(value) => updateFormData('gender', value)} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, gender: value }))} 
           placeholder="Select Gender" 
           options={genderOptions}
           loading={false}
@@ -591,7 +934,7 @@ const AddOccupant = () => {
           label="Contact Number" 
           required 
           value={formData.contactNumber} 
-          onChangeText={(text) => updateFormData('contactNumber', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, contactNumber: text }))} 
           placeholder="Phone No.." 
           keyboardType="phone-pad" 
         />
@@ -599,7 +942,7 @@ const AddOccupant = () => {
           label="Email" 
           required 
           value={formData.email} 
-          onChangeText={(text) => updateFormData('email', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, email: text }))} 
           placeholder="example@mail.com" 
           keyboardType="email-address" 
         />
@@ -607,7 +950,7 @@ const AddOccupant = () => {
           label="Aadhar Number" 
           required 
           value={formData.aadharNumber} 
-          onChangeText={(text) => updateFormData('aadharNumber', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, aadharNumber: text }))} 
           placeholder="1234 5678 9101" 
           keyboardType="numeric" 
         />
@@ -615,7 +958,7 @@ const AddOccupant = () => {
           label="PAN Number" 
           required 
           value={formData.panNumber} 
-          onChangeText={(text) => updateFormData('panNumber', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, panNumber: text }))} 
           placeholder="ABCDE1234F" 
         />
       </FormCard>
@@ -625,7 +968,7 @@ const AddOccupant = () => {
           label="Country" 
           required 
           selectedValue={formData.country} 
-          onValueChange={(value) => updateFormData('country', value)} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, country: value }))} 
           placeholder="Select Country" 
           items={['India', 'USA', 'UK', 'Canada']} 
         />
@@ -633,14 +976,14 @@ const AddOccupant = () => {
           label="State" 
           required 
           selectedValue={formData.state} 
-          onValueChange={(value) => updateFormData('state', value)} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, state: value }))} 
           placeholder="Select State" 
           items={statesOfIndia} 
         />
         <InputField 
           label="Pin Code" 
           value={formData.pinCode} 
-          onChangeText={(text) => updateFormData('pinCode', text)} 
+          onChangeText={(text) => setFormData(prev => ({ ...prev, pinCode: text }))} 
           placeholder="751001" 
           keyboardType="numeric" 
         />
@@ -649,7 +992,7 @@ const AddOccupant = () => {
           <TextInput 
             style={[styles.input, styles.textArea]} 
             value={formData.address} 
-            onChangeText={(text) => updateFormData('address', text)} 
+            onChangeText={(text) => setFormData(prev => ({ ...prev, address: text }))} 
             placeholder="Enter full address..." 
             multiline 
             numberOfLines={4} 
@@ -667,7 +1010,7 @@ const AddOccupant = () => {
           label="Unit" 
           required 
           selectedValue={formData.unit} 
-          onValueChange={(value) => updateFormData('unit', value)} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, unit: value }))} 
           placeholder="Select unit" 
           items={['Room A', 'Room B', 'Room C', 'Apartment 1']} 
         />
@@ -675,7 +1018,7 @@ const AddOccupant = () => {
           label="Occupant Type" 
           required 
           selectedValue={formData.occupantType} 
-          onValueChange={(value) => updateFormData('occupantType', value)} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, occupantType: value }))} 
           placeholder="Select type" 
           items={['Tenant', 'Owner', 'Guest']} 
         />
@@ -703,7 +1046,7 @@ const AddOccupant = () => {
         <PickerField 
           label="Relation with Primary Occupant" 
           selectedValue={formData.relationWithPrimary} 
-          onValueChange={(value) => updateFormData('relationWithPrimary', value)} 
+          onValueChange={(value) => setFormData(prev => ({ ...prev, relationWithPrimary: value }))} 
           placeholder="Select Relation" 
           items={['Spouse', 'Child', 'Parent', 'Sibling', 'Friend']} 
         />
@@ -714,12 +1057,12 @@ const AddOccupant = () => {
             <RadioButton 
               label="Yes" 
               selected={formData.isPrimaryOccupant === 'Yes'} 
-              onPress={() => updateFormData('isPrimaryOccupant', 'Yes')} 
+              onPress={() => setFormData(prev => ({ ...prev, isPrimaryOccupant: 'Yes' }))} 
             />
             <RadioButton 
               label="No" 
               selected={formData.isPrimaryOccupant === 'No'} 
-              onPress={() => updateFormData('isPrimaryOccupant', 'No')} 
+              onPress={() => setFormData(prev => ({ ...prev, isPrimaryOccupant: 'No' }))} 
             />
           </View>
         </View>
@@ -733,7 +1076,6 @@ const AddOccupant = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="refresh" size={16} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.resetButtonText}>Reset</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -745,7 +1087,6 @@ const AddOccupant = () => {
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Ionicons name="checkmark" size={16} color="#fff" style={{ marginRight: 8 }} />
             <Text style={styles.saveButtonText}>Save</Text>
           </LinearGradient>
         </TouchableOpacity>
@@ -829,6 +1170,263 @@ const modalStyles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#dc3545',
+  },
+
+  // Success Modal Styles
+  successOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  successContent: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 300,
+  },
+  successGradient: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  successCheckContainer: {
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    opacity: 0.9,
+  },
+
+  // Error Modal Styles
+  errorOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  errorContent: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 300,
+  },
+  errorGradient: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  errorIconContainer: {
+    marginBottom: 20,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  errorMessage: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 20,
+  },
+  errorButton: {
+    backgroundColor: 'white',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  errorButtonText: {
+    color: '#e74c3c',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Info Modal Styles
+  infoOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  infoContent: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 300,
+  },
+  infoGradient: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  infoIconContainer: {
+    marginBottom: 20,
+  },
+  infoTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  infoMessage: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 20,
+  },
+  infoButton: {
+    backgroundColor: 'white',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 25,
+  },
+  infoButtonText: {
+    color: '#3498db',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Reset Modal Styles
+  resetOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  resetContent: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 320,
+  },
+  resetGradient: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  resetIconContainer: {
+    marginBottom: 20,
+  },
+  resetTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  resetMessage: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 30,
+  },
+  resetButtonContainer: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  resetModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  // cancelButton: {
+  //   backgroundColor: 'rgba(255, 255, 255, 0.2)',
+  //   borderWidth: 1,
+  //   borderColor: 'white',
+  // },
+  confirmButton: {
+    backgroundColor: 'white',
+  },
+  // cancelButtonText: {
+  //   color: 'white',
+  //   fontSize: 16,
+  //   fontWeight: '600',
+  // },
+  confirmButtonText: {
+    color: '#f39c12',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+
+  // Back Modal Styles
+  backOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  backContent: {
+    borderRadius: 20,
+    overflow: 'hidden',
+    width: '100%',
+    maxWidth: 320,
+  },
+  backGradient: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  backIconContainer: {
+    marginBottom: 20,
+  },
+  backTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  backMessage: {
+    fontSize: 16,
+    color: 'white',
+    textAlign: 'center',
+    opacity: 0.9,
+    marginBottom: 30,
+  },
+  backButtonContainer: {
+    flexDirection: 'row',
+    gap: 15,
+  },
+  backModalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 25,
+    alignItems: 'center',
+  },
+  stayButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderWidth: 1,
+    borderColor: 'white',
+  },
+  goBackButton: {
+    backgroundColor: 'white',
+  },
+  stayButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  goBackButtonText: {
+    color: '#f39c12',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

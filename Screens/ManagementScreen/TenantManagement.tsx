@@ -14,6 +14,7 @@ import {
   StatusBar,
   Platform,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -24,6 +25,100 @@ const API_CONFIG = {
   url: 'https://applianceservicemgmt.dev2stage.in/api/rest/Invoke',
   authKey: '86A264E4-ECF8-4627-AF83-5512FE83DAE6',
   hostKey: '8ECB211D2',
+};
+
+// Image API Configuration
+const IMAGE_API_CONFIG = {
+  url: 'https://cp.societylife.itpluspoint.in/api/image/get-image-url',
+};
+
+// FIXED: Function to extract filename from URL path
+const getFileNameFromUrl = (urlOrPath: string): string | null => {
+  if (!urlOrPath || typeof urlOrPath !== 'string') {
+    return null;
+  }
+  
+  try {
+    // Remove any query parameters first
+    const cleanUrl = urlOrPath.split('?')[0];
+    
+    // Extract filename from the path (last segment after /)
+    const fileName = cleanUrl.substring(cleanUrl.lastIndexOf('/') + 1);
+    
+    console.log(`📎 Extracted filename from "${cleanUrl}": "${fileName}"`);
+    return fileName || null;
+  } catch (error) {
+    console.error('❌ Error extracting filename from URL:', error);
+    return null;
+  }
+};
+
+// Function to fetch image URL from server
+const fetchImageUrl = async (fileName: string, imageFolderName: string): Promise<string | null> => {
+  if (!fileName || fileName === 'NULL' || fileName === null || fileName === '') {
+    console.log('🚫 fetchImageUrl: No fileName provided');
+    return null;
+  }
+
+  try {
+    console.log(`🖼️  Fetching image URL for fileName: "${fileName}", imageFolderName: "${imageFolderName}"`);
+    
+    const apiUrl = `${IMAGE_API_CONFIG.url}?fileName=${encodeURIComponent(fileName)}&imageFolderName=${encodeURIComponent(imageFolderName)}`;
+    console.log('🌐 Full Image API URL:', apiUrl);
+    
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    
+    console.log(`📡 Image API Response Status: ${response.status} ${response.statusText}`);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.warn(`❌ Image fetch failed with status: ${response.status}`);
+      console.warn('❌ Error response body:', errorText);
+      return null;
+    }
+
+    const responseText = await response.text();
+    console.log('📄 Raw Image API response:', responseText);
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('💥 Failed to parse Image API JSON response:', parseError);
+      return null;
+    }
+    
+    console.log('✅ Parsed Image API response data:', data);
+    
+    if (data && data.Url) {
+      console.log('🎯 Successfully got image URL:', data.Url);
+      return data.Url;
+    } else {
+      console.warn('⚠️  No URL found in response data. Available keys:', Object.keys(data || {}));
+      return null;
+    }
+    
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error('⏰ Image fetch timeout after 15 seconds');
+    } else {
+      console.error('💥 Error fetching image URL:', error.message || error);
+    }
+    return null;
+  }
 };
 
 interface Tenant {
@@ -65,6 +160,162 @@ interface Tenant {
   tenantGUID?: string;
 }
 
+// Enhanced Avatar Component with dynamic image fetching
+const TenantAvatar: React.FC<{ 
+  profileImage?: string; 
+  name: string; 
+  size?: number;
+  style?: any;
+}> = ({ profileImage, name, size = 50, style }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [loadingImg, setLoadingImg] = useState(false);
+  
+  const getInitials = (fullName: string) => 
+    fullName.split(' ').map(w => w[0]?.toUpperCase() || '').join('').substring(0, 2) || "TN";
+
+  useEffect(() => {
+    const fetchTenantImage = async () => {
+      if (profileImage && typeof profileImage === 'string') {
+        const photoData = profileImage.trim();
+        console.log(`🖼️  Processing tenant photo for ${name}:`, photoData);
+        
+        // Check if it's not HTML content and has actual data
+        if (!photoData.startsWith('<!DOCTYPE') && 
+            !photoData.startsWith('<html') && 
+            !photoData.startsWith('<HTML') &&
+            photoData !== 'NULL' &&
+            photoData !== 'null' &&
+            photoData !== '') {
+          
+          try {
+            setLoadingImg(true);
+            
+            // FIXED: Check if it's already a full URL or just a filename
+            let fileName: string | null = null;
+            
+            if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
+              // Extract filename from full URL
+              console.log(`🔍 Extracting filename from URL: ${photoData}`);
+              fileName = getFileNameFromUrl(photoData);
+              
+              if (!fileName) {
+                console.warn(`⚠️  Could not extract filename from URL: ${photoData}`);
+                setImageError(true);
+                return;
+              }
+            } else {
+              // Assume it's already a filename
+              fileName = photoData;
+            }
+            
+            console.log(`🚀 Attempting to fetch tenant image URL for filename: "${fileName}"`);
+            
+            // Use the correct folder name "TenantSocietyLogo_FolderPath"
+            const fetchedImageUrl = await fetchImageUrl(fileName, 'TenantSocietyLogo_FolderPath');
+            
+            if (fetchedImageUrl) {
+              console.log(`✅ Successfully got tenant image URL:`, fetchedImageUrl);
+              setImageUrl(fetchedImageUrl);
+              setImageError(false);
+            } else {
+              console.log(`❌ No tenant image URL received for filename: ${fileName}`);
+              setImageError(true);
+            }
+            
+          } catch (error) {
+            console.error(`💥 Error processing tenant photo for ${name}:`, error);
+            setImageError(true);
+          } finally {
+            setLoadingImg(false);
+          }
+        } else {
+          console.log(`🚫 Skipping invalid tenant photo data for ${name}`);
+          setImageError(true);
+        }
+      } else {
+        console.log(`📝 No photo data for tenant ${name}`);
+        setImageError(true);
+      }
+    };
+
+    fetchTenantImage();
+  }, [profileImage, name]);
+
+  // Show initials if no image URL or error
+  if (!imageUrl || imageError) {
+    return (
+      <LinearGradient
+        colors={['#146070', '#03C174']}
+        style={[{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          justifyContent: 'center',
+          alignItems: 'center',
+        }, style]}
+      >
+        <Text style={{
+          color: '#fff',
+          fontSize: size * 0.36,
+          fontWeight: '600',
+        }}>
+          {getInitials(name)}
+        </Text>
+      </LinearGradient>
+    );
+  }
+
+  // Show image with loading state
+  return (
+    <View style={{ position: 'relative' }}>
+      {/* Loading indicator */}
+      {loadingImg && (
+        <View style={[{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+          backgroundColor: '#f0f0f0',
+          justifyContent: 'center',
+          alignItems: 'center',
+          position: 'absolute',
+          zIndex: 2
+        }, style]}>
+          <ActivityIndicator size="small" color="#146070" />
+        </View>
+      )}
+      
+      {/* Actual image */}
+      <Image 
+        source={{ uri: imageUrl }} 
+        style={[{
+          width: size,
+          height: size,
+          borderRadius: size / 2,
+        }, style]} 
+        onLoadStart={() => {
+          console.log(`🔄 Tenant image load started for ${name}`);
+          setLoadingImg(true);
+        }}
+        onLoad={() => {
+          console.log(`✅ Tenant image loaded successfully for ${name}`);
+          setLoadingImg(false);
+          setImageError(false);
+        }} 
+        onError={(error) => {
+          console.error(`❌ Tenant image load failed for ${name}:`, error.nativeEvent);
+          setImageError(true);
+          setLoadingImg(false);
+        }} 
+        onLoadEnd={() => {
+          setLoadingImg(false);
+        }}
+        resizeMode="cover"
+      />
+    </View>
+  );
+};
+
 const TenantManagement: React.FC = () => {
   const navigation = useNavigation();
   const [tenants, setTenants] = useState<Tenant[]>([]);
@@ -90,8 +341,49 @@ const TenantManagement: React.FC = () => {
     navigation.goBack();
   };
 
-  // Transform API response to Tenant object
-  const transformApiResponse = (item: any): Tenant => {
+  // ENHANCED: Transform API response to Tenant object with image URL fetching
+  const transformApiResponse = async (item: any): Promise<Tenant> => {
+    console.log(`🔄 Processing tenant:`, item.First_Name, item.Last_Name);
+    
+    // FIXED: Handle profile image URL extraction and fetching
+    let profileImageUrl = "";
+    if (item.Profile_Image && typeof item.Profile_Image === 'string') {
+      const photoData = item.Profile_Image.trim();
+      console.log(`🖼️  Processing tenant profile image:`, photoData);
+      
+      if (!photoData.startsWith('<!DOCTYPE') && 
+          !photoData.startsWith('<html') && 
+          !photoData.startsWith('<HTML') &&
+          photoData !== 'NULL' &&
+          photoData !== 'null' &&
+          photoData !== '') {
+        
+        try {
+          // Extract filename from URL if it's a full URL
+          let fileName: string | null = null;
+          
+          if (photoData.startsWith('http://') || photoData.startsWith('https://')) {
+            // Extract filename from full URL
+            console.log(`🔍 Extracting filename from profile image URL: ${photoData}`);
+            fileName = getFileNameFromUrl(photoData);
+          } else {
+            // Assume it's already a filename
+            fileName = photoData;
+          }
+          
+          if (fileName) {
+            const fetchedImageUrl = await fetchImageUrl(fileName, 'TenantSocietyLogo_FolderPath');
+            if (fetchedImageUrl) {
+              console.log(`✅ Successfully got tenant profile image URL:`, fetchedImageUrl);
+              profileImageUrl = fetchedImageUrl;
+            }
+          }
+        } catch (error) {
+          console.error(`💥 Error fetching tenant profile image:`, error);
+        }
+      }
+    }
+
     return {
       id: String(item.Tenant_Id || item.Id || Math.random()),
       name: `${item.First_Name || ''} ${item.Last_Name || ''}`.trim() || 'N/A',
@@ -104,7 +396,7 @@ const TenantManagement: React.FC = () => {
       leaseEndDate: item.Effective_End_Date || item.Lease_End_Date || 'N/A',
       rentAmount: item.Rent_Amount || 0,
       status: item.Is_Active === 1 ? 'active' : (item.Is_Active === 0 ? 'inactive' : 'pending'),
-      profileImage: item.Profile_Image || '',
+      profileImage: profileImageUrl, // Use the fetched image URL
       emergencyContact: {
         name: item.Emergency_Contact_Name || 'N/A',
         phone: item.Emergency_Contact_Phone || 'N/A',
@@ -131,13 +423,13 @@ const TenantManagement: React.FC = () => {
     };
   };
 
-  // Fetch tenants from API
+  // ENHANCED: Fetch tenants from API with image URL fetching
   const fetchTenants = async (showLoader = true) => {
     if (showLoader) setLoading(true);
     setError('');
     
     try {
-      console.log('Fetching tenants from API...');
+      console.log('🔍 Fetching tenants from API...');
 
       // Build parameter string for the stored procedure
       const valuesString = `@p_Tenant_Id=NULL,@p_Society_Id=7,@p_Society_GUID=NULL,@p_Contact_Id=NULL,@p_Unit_Id=280,@p_From_Effective_Start_Date=NULL,@p_To_Effective_Start_Date=NULL,@p_From_Effective_End_Date=NULL,@p_To_Effective_End_Date=NULL,@p_Approved_By=NULL,@p_From_Approved_Date=NULL,@p_To_Approved_Date=NULL,@p_Is_Approved=NULL,@p_Tenant_Status_Id=NULL,@p_Profile_Image=NULL,@p_Attribute1=NULL,@p_Attribute2=NULL,@p_Attribute3=NULL,@p_Attribute4=NULL,@p_Attribute5=NULL,@p_Attribute6=NULL,@p_Attribute7=NULL,@p_Attribute8=NULL,@p_Attribute9=NULL,@p_Is_Active=NULL,@p_Is_Archived=NULL,@p_Skip=0,@p_Take=50000,@p_Email=NULL,@p_First_Name=NULL,@p_Is_Access=NULL,@p_Tenant_GUID=NULL`;
@@ -150,7 +442,7 @@ const TenantManagement: React.FC = () => {
         Values: valuesString,
       }).toString();
 
-      console.log('API Request Body:', requestBody);
+      console.log('📤 Tenant API Request Body:', requestBody);
 
       // Make API call
       const response = await fetch(API_CONFIG.url, {
@@ -163,38 +455,54 @@ const TenantManagement: React.FC = () => {
       });
 
       const responseText = await response.text();
-      console.log('Raw API Response:', responseText);
+      console.log('📥 Raw Tenant API Response (first 500 chars):', responseText.substring(0, 500) + '...');
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${responseText}`);
       }
 
       const result = JSON.parse(responseText);
-      console.log('Parsed API Response:', result);
+      console.log('✅ Parsed Tenant API Response structure:', Object.keys(result || {}));
 
-      // Transform API response into Tenant array
-      let transformedData: Tenant[] = [];
+      // Transform API response into Tenant array with image fetching
+      let rawData: any[] = [];
       if (result?.Data && Array.isArray(result.Data)) {
-        console.log('Found Data array with length:', result.Data.length);
-        transformedData = result.Data.map((item: any) => transformApiResponse(item));
+        console.log('📋 Found Data array with length:', result.Data.length);
+        rawData = result.Data;
       } else if (Array.isArray(result)) {
-        console.log('Found direct array with length:', result.length);
-        transformedData = result.map((item: any) => transformApiResponse(item));
+        console.log('📋 Found direct array with length:', result.length);
+        rawData = result;
       } else if (result?.data && Array.isArray(result.data)) {
-        console.log('Found data array with length:', result.data.length);
-        transformedData = result.data.map((item: any) => transformApiResponse(item));
+        console.log('📋 Found data array with length:', result.data.length);
+        rawData = result.data;
       } else if (result?.Result && Array.isArray(result.Result)) {
-        console.log('Found Result array with length:', result.Result.length);
-        transformedData = result.Result.map((item: any) => transformApiResponse(item));
+        console.log('📋 Found Result array with length:', result.Result.length);
+        rawData = result.Result;
       } else if (typeof result === 'object' && result !== null) {
-        console.log('Found single object, converting to array');
-        transformedData = [transformApiResponse(result)];
+        console.log('📋 Found single object, converting to array');
+        rawData = [result];
       } else {
-        console.log('No recognizable data structure found');
-        transformedData = [];
+        console.log('❌ No recognizable data structure found');
+        rawData = [];
       }
 
-      console.log('Final transformed tenants:', transformedData);
+      // Transform data with image URL fetching (async operation)
+      console.log(`🔄 Starting transformation of ${rawData.length} tenant records...`);
+      const transformedData: Tenant[] = [];
+      
+      for (let i = 0; i < rawData.length; i++) {
+        try {
+          const transformedTenant = await transformApiResponse(rawData[i]);
+          transformedData.push(transformedTenant);
+        } catch (transformError) {
+          console.error(`💥 Error transforming tenant ${i + 1}:`, transformError);
+          // Continue with other tenants even if one fails
+        }
+      }
+
+      console.log(`✅ Successfully transformed ${transformedData.length} tenants`);
+      console.log('📊 Tenants with profile images:', transformedData.filter(t => t.profileImage).length);
+
       setTenants(transformedData);
       setFilteredTenants(transformedData);
       calculateStats(transformedData);
@@ -204,7 +512,7 @@ const TenantManagement: React.FC = () => {
       }
       
     } catch (error: any) {
-      console.error('Error fetching tenants:', error);
+      console.error('💥 Tenant API Error:', error);
       const errorMessage = error.message || 'Unknown error occurred';
       setError(errorMessage);
       Alert.alert('API Error', `Failed to fetch tenants: ${errorMessage}`);
@@ -320,18 +628,16 @@ const TenantManagement: React.FC = () => {
       <View style={styles.cardHeader}>
         <View style={styles.tenantInfo}>
           <View style={styles.avatarContainer}>
-            <LinearGradient
-              colors={['#146070', '#03C174']}
+            <TenantAvatar
+              profileImage={item.profileImage}
+              name={item.name}
+              size={50}
               style={styles.avatar}
-            >
-              <Text style={styles.avatarText}>
-                {item.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-              </Text>
-            </LinearGradient>
+            />
           </View>
           <View style={styles.tenantDetails}>
             <Text style={styles.tenantName}>{item.name}</Text>
-            <Text style={styles.unitNumber}>Unit: {item.unitNumber}</Text>
+            {/* <Text style={styles.unitNumber}>Unit: {item.unitNumber}</Text> */}
             <Text style={styles.tenantPhone}>{item.phone}</Text>
           </View>
         </View>
@@ -351,10 +657,10 @@ const TenantManagement: React.FC = () => {
           <Ionicons name="calendar-outline" size={14} color="#666" />
           <Text style={styles.infoText}>Lease: {item.leaseStartDate} - {item.leaseEndDate}</Text>
         </View>
-        <View style={styles.infoRow}>
+        {/* <View style={styles.infoRow}>
           <Ionicons name="card-outline" size={14} color="#666" />
           <Text style={styles.infoText}>₹{item.rentAmount.toLocaleString()}/month</Text>
-        </View>
+        </View> */}
       </View>
 
       <View style={styles.cardActions}>
@@ -383,7 +689,7 @@ const TenantManagement: React.FC = () => {
       <Text style={styles.emptySubtext}>
         {tenants.length === 0
           ? "There are no tenants to display. Add your first tenant to get started."
-          : "No tenants match your search criteria. Try adjusting your filters."
+          : "No tenants match your search criteria."
         }
       </Text>
       {tenants.length === 0 && (
@@ -426,6 +732,26 @@ const TenantManagement: React.FC = () => {
 
           {selectedTenant && (
             <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
+              {/* Tenant Photo Section */}
+              <View style={styles.modalSection}>
+                <Text style={styles.modalSectionTitle}>Tenant Photo</Text>
+                <View style={styles.photoContainer}>
+                  <TenantAvatar
+                    profileImage={selectedTenant.profileImage}
+                    name={selectedTenant.name}
+                    size={80}
+                  />
+                  <View style={styles.photoInfo}>
+                    <Text style={styles.photoName}>{selectedTenant.name}</Text>
+                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(selectedTenant.status) + '20' }]}>
+                      <Text style={[styles.statusText, { color: getStatusColor(selectedTenant.status) }]}>
+                        {getStatusLabel(selectedTenant.status)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
               <View style={styles.modalSection}>
                 <Text style={styles.modalSectionTitle}>Personal Information</Text>
                 <View style={styles.detailRow}>
@@ -716,7 +1042,7 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: '#fff',
     paddingTop: Platform.OS === 'ios' ? 10 : 20,
-    paddingBottom: 15,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     elevation: 2,
@@ -746,7 +1072,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 23,
     fontWeight: '700',
     color: '#146070',
   },
@@ -766,7 +1092,7 @@ const styles = StyleSheet.create({
   addButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 10,
     borderRadius: 10,
   },
@@ -844,7 +1170,7 @@ const styles = StyleSheet.create({
   // Search Styles
   searchContainer: {
     paddingHorizontal: 20,
-    paddingTop: 20,
+    paddingTop: 15,
   },
   searchInputContainer: {
     flexDirection: 'row',
@@ -863,14 +1189,14 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    paddingVertical: 14,
+    paddingVertical: 10,
     fontSize: 16,
     color: '#333',
   },
 
   // Filter Styles
   filterContainer: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 15,
     paddingTop: 15,
   },
   filterPill: {
@@ -1108,6 +1434,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     paddingBottom: 8,
+  },
+  // Photo section styles
+  photoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    padding: 16,
+    borderRadius: 12,
+    gap: 16,
+  },
+  photoInfo: {
+    flex: 1,
+    gap: 8,
+  },
+  photoName: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#333',
   },
   detailRow: {
     flexDirection: 'row',

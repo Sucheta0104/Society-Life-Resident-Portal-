@@ -15,6 +15,7 @@ import {
 import { Ionicons, MaterialIcons, Feather } from '@expo/vector-icons';
 import { useNavigation } from "@react-navigation/native";
 import axios from 'axios';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const Dashboard = () => {
   const navigation = useNavigation();
@@ -93,220 +94,29 @@ const Dashboard = () => {
   const [expandedAnnouncements, setExpandedAnnouncements] = useState<{[key: string]: boolean}>({});
 
   // FIXED: Comprehensive date formatting function with better error handling and validation
-  const formatDateTime = useCallback((dateString: string | null | undefined, timeString?: string | null | undefined) => {
-    // Handle null, undefined, empty, or invalid input
-    if (!dateString || 
-        dateString === 'NULL' || 
-        dateString === 'null' || 
-        dateString === '' || 
-        dateString === '0000-00-00' ||
-        dateString === '1900-01-01' ||
-        dateString === '0001-01-01') {
+ const formatDateTime = useCallback(
+  (
+    dateString: string | null | undefined,
+    timeString?: string | null | undefined
+  ): string => {
+    // Reject empty/invalid placeholders
+    if (
+      !dateString ||
+      dateString === 'NULL' ||
+      dateString === 'null' ||
+      dateString === '' ||
+      dateString === '0000-00-00' ||
+      dateString === '1900-01-01' ||
+      dateString === '0001-01-01'
+    ) {
       return '';
-    }
-    
-    try {
-      // Clean and normalize the date string
-      let cleanDateString = String(dateString).trim();
-      
-      // Remove common problematic characters and normalize
-      cleanDateString = cleanDateString
-        .replace(/T00:00:00\.000Z?$/i, '') // Remove T00:00:00.000Z
-        .replace(/T00:00:00Z?$/i, '') // Remove T00:00:00Z
-        .replace(/\s+00:00:00$/, '') // Remove trailing 00:00:00
-        .replace(/Z$/i, '') // Remove trailing Z
-        .replace(/\+00:?00$/i, '') // Remove +0000 or +00:00
-        .trim();
-
-      let parsedDate: Date | null = null;
-
-      // Try different parsing strategies
-      const parsingStrategies = [
-        // 1. ISO 8601 format with proper timezone handling
-        () => {
-          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(cleanDateString)) {
-            // For ISO format, ensure it has proper Z suffix for UTC
-            let isoString = cleanDateString;
-            if (!isoString.includes('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
-              isoString += 'Z';
-            }
-            return new Date(isoString);
-          }
-          return null;
-        },
-
-        // 2. YYYY-MM-DD format
-        () => {
-          if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDateString)) {
-            const [year, month, day] = cleanDateString.split('-').map(Number);
-            if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-              return new Date(year, month - 1, day); // month is 0-indexed
-            }
-          }
-          return null;
-        },
-
-        // 3. DD/MM/YYYY or MM/DD/YYYY format
-        () => {
-          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDateString)) {
-            const parts = cleanDateString.split('/').map(Number);
-            if (parts.length === 3) {
-              const [first, second, year] = parts;
-              
-              // Try DD/MM/YYYY first (more common internationally)
-              if (first <= 31 && second <= 12 && year >= 1900 && year <= 2100) {
-                const testDate = new Date(year, second - 1, first);
-                if (testDate.getFullYear() === year && 
-                    testDate.getMonth() === second - 1 && 
-                    testDate.getDate() === first) {
-                  return testDate;
-                }
-              }
-              
-              // Try MM/DD/YYYY if DD/MM/YYYY failed
-              if (first <= 12 && second <= 31 && year >= 1900 && year <= 2100) {
-                const testDate = new Date(year, first - 1, second);
-                if (testDate.getFullYear() === year && 
-                    testDate.getMonth() === first - 1 && 
-                    testDate.getDate() === second) {
-                  return testDate;
-                }
-              }
-            }
-          }
-          return null;
-        },
-
-        // 4. DD-MM-YYYY format
-        () => {
-          if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(cleanDateString)) {
-            const [day, month, year] = cleanDateString.split('-').map(Number);
-            if (day <= 31 && month <= 12 && year >= 1900 && year <= 2100) {
-              const testDate = new Date(year, month - 1, day);
-              if (testDate.getFullYear() === year && 
-                  testDate.getMonth() === month - 1 && 
-                  testDate.getDate() === day) {
-                return testDate;
-              }
-            }
-          }
-          return null;
-        },
-
-        // 5. YYYYMMDD format
-        () => {
-          if (/^\d{8}$/.test(cleanDateString)) {
-            const year = parseInt(cleanDateString.substring(0, 4));
-            const month = parseInt(cleanDateString.substring(4, 6));
-            const day = parseInt(cleanDateString.substring(6, 8));
-            
-            if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-              const testDate = new Date(year, month - 1, day);
-              if (testDate.getFullYear() === year && 
-                  testDate.getMonth() === month - 1 && 
-                  testDate.getDate() === day) {
-                return testDate;
-              }
-            }
-          }
-          return null;
-        },
-
-        // 6. Last resort - try native Date parsing
-        () => {
-          try {
-            const nativeDate = new Date(cleanDateString);
-            // Check if it's a valid date and not in the past century (likely invalid)
-            if (!isNaN(nativeDate.getTime()) && nativeDate.getFullYear() > 1900) {
-              return nativeDate;
-            }
-          } catch (e) {
-            // Ignore errors and continue
-          }
-          return null;
-        }
-      ];
-
-      // Try each strategy until one succeeds
-      for (const strategy of parsingStrategies) {
-        try {
-          const result = strategy();
-          if (result && !isNaN(result.getTime()) && result.getFullYear() > 1900) {
-            parsedDate = result;
-            break;
-          }
-        } catch (e) {
-          continue;
-        }
-      }
-
-      // If no date could be parsed, return empty string
-      if (!parsedDate || isNaN(parsedDate.getTime())) {
-        console.warn(`Could not parse date: "${dateString}"`);
-        return '';
-      }
-
-      // Add time if provided and valid
-      if (timeString && 
-          timeString !== 'NULL' && 
-          timeString !== 'null' && 
-          timeString !== '' &&
-          typeof timeString === 'string') {
-        try {
-          const cleanTime = timeString.trim();
-          const timeParts = cleanTime.split(':');
-          
-          if (timeParts.length >= 2) {
-            const hour = parseInt(timeParts[0]);
-            const minute = parseInt(timeParts[1]);
-            const second = timeParts.length >= 3 ? parseInt(timeParts[2]) : 0;
-            
-            // Validate time components
-            if (hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 && second >= 0 && second <= 59) {
-              parsedDate.setHours(hour, minute, second);
-            }
-          }
-        } catch (timeError) {
-          console.warn(`Error parsing time: ${timeString}`, timeError);
-        }
-      }
-
-      // Format the date for display
-      const formatOptions: Intl.DateTimeFormatOptions = timeString && timeString !== 'NULL' && timeString !== 'null' && timeString !== '' ? {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: true
-      } : {
-        year: 'numeric',
-        month: 'short',
-        day: '2-digit'
-      };
-
-      return parsedDate.toLocaleDateString('en-US', formatOptions);
-      
-    } catch (error) {
-      console.error(`Date formatting error for "${dateString}":`, error);
-      return '';
-    }
-  }, []);
-
-  // FIXED: Parse and get date for sorting (returns Date object or null)
-  const parseDate = useCallback((dateString: string | null | undefined): Date | null => {
-    if (!dateString || 
-        dateString === 'NULL' || 
-        dateString === 'null' || 
-        dateString === '' || 
-        dateString === '0000-00-00' ||
-        dateString === '1900-01-01' ||
-        dateString === '0001-01-01') {
-      return null;
     }
 
     try {
-      let cleanDateString = String(dateString).trim()
+      let cleanDate = String(dateString).trim();
+
+      // Remove common suffixes or timezone clutter
+      cleanDate = cleanDate
         .replace(/T00:00:00\.000Z?$/i, '')
         .replace(/T00:00:00Z?$/i, '')
         .replace(/\s+00:00:00$/, '')
@@ -314,37 +124,185 @@ const Dashboard = () => {
         .replace(/\+00:?00$/i, '')
         .trim();
 
-      // Try ISO format first
-      if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(cleanDateString)) {
-        let isoString = cleanDateString;
-        if (!isoString.includes('Z') && !isoString.includes('+') && !isoString.includes('-', 10)) {
-          isoString += 'Z';
+      let parsedDate: Date | null = null;
+
+      // --- Parsing strategies ---
+      const strategies = [
+        // 1) ISO 8601 full
+        () => {
+          if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(cleanDate)) {
+            let iso = cleanDate;
+            if (!/[Z+-]/.test(iso.slice(-1))) iso += 'Z';
+            return new Date(iso);
+          }
+          return null;
+        },
+        // 2) YYYY-MM-DD
+        () => {
+          if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDate)) {
+            const [y, m, d] = cleanDate.split('-').map(Number);
+            return new Date(y, m - 1, d);
+          }
+          return null;
+        },
+        // 3) DD/MM/YYYY or MM/DD/YYYY
+        () => {
+          if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(cleanDate)) {
+            const [a, b, y] = cleanDate.split('/').map(Number);
+            if (a <= 31 && b <= 12) {
+              const d = new Date(y, b - 1, a);
+              if (d.getDate() === a) return d;
+            }
+            if (a <= 12 && b <= 31) {
+              const d = new Date(y, a - 1, b);
+              if (d.getDate() === b) return d;
+            }
+          }
+          return null;
+        },
+        // 4) DD-MM-YYYY
+        () => {
+          if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(cleanDate)) {
+            const [d, m, y] = cleanDate.split('-').map(Number);
+            return new Date(y, m - 1, d);
+          }
+          return null;
+        },
+        // 5) YYYYMMDD
+        () => {
+          if (/^\d{8}$/.test(cleanDate)) {
+            const y = parseInt(cleanDate.slice(0, 4));
+            const m = parseInt(cleanDate.slice(4, 6));
+            const d = parseInt(cleanDate.slice(6, 8));
+            return new Date(y, m - 1, d);
+          }
+          return null;
+        },
+        // 6) “Nov 18 2024 12:25PM”
+        () => {
+          const match = cleanDate.match(
+            /^[A-Za-z]{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}(AM|PM)$/i
+          );
+          if (match) {
+            const [mon, day, year, hm] = cleanDate.split(/\s+/);
+            const [hStr, mStr] = hm.replace(/AM|PM/i, '').split(':');
+            const isPM = /PM$/i.test(hm);
+            const hour = (parseInt(hStr, 10) % 12) + (isPM ? 12 : 0);
+            const minute = parseInt(mStr, 10);
+            return new Date(`${mon} ${day} ${year} ${hour}:${minute}:00`);
+          }
+          return null;
+        },
+        // 7) Native fallback
+        () => {
+          const nd = new Date(cleanDate);
+          return isNaN(nd.getTime()) ? null : nd;
+        },
+      ];
+
+      for (const s of strategies) {
+        const r = s();
+        if (r) {
+          parsedDate = r;
+          break;
         }
-        const date = new Date(isoString);
-        return !isNaN(date.getTime()) ? date : null;
       }
 
-      // Try YYYY-MM-DD format
-      if (/^\d{4}-\d{2}-\d{2}$/.test(cleanDateString)) {
-        const [year, month, day] = cleanDateString.split('-').map(Number);
-        if (year >= 1900 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-          const date = new Date(year, month - 1, day);
-          return !isNaN(date.getTime()) ? date : null;
+      if (!parsedDate) return '';
+
+      // ⏱️ Apply extra time string if supplied (HH:mm[:ss])
+      if (
+        timeString &&
+        typeof timeString === 'string' &&
+        !['NULL', 'null', ''].includes(timeString)
+      ) {
+        const parts = timeString.trim().split(':').map(Number);
+        if (parts.length >= 2) {
+          const [h, m, sec = 0] = parts;
+          if (h >= 0 && h < 24 && m >= 0 && m < 60 && sec >= 0 && sec < 60) {
+            parsedDate.setHours(h, m, sec);
+          }
         }
       }
 
-      // Try native Date parsing as last resort
-      const nativeDate = new Date(cleanDateString);
-      if (!isNaN(nativeDate.getTime()) && nativeDate.getFullYear() > 1900) {
-        return nativeDate;
-      }
+      const opts: Intl.DateTimeFormatOptions =
+        timeString && !['NULL', 'null', ''].includes(timeString)
+          ? {
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+              hour: '2-digit',
+              minute: '2-digit',
+              hour12: true,
+            }
+          : { year: 'numeric', month: 'short', day: '2-digit' };
 
-      return null;
-    } catch (error) {
-      console.error(`Error parsing date for sorting: "${dateString}"`, error);
+      return parsedDate.toLocaleDateString('en-US', opts);
+    } catch (err) {
+      console.error('formatDateTime error:', err);
+      return '';
+    }
+  },
+  []
+);
+  // FIXED: Parse and get date for sorting (returns Date object or null)
+  const parseDate = useCallback(
+  (dateString: string | Date | null | undefined): Date | null => {
+    if (
+      !dateString ||
+      dateString === 'NULL' ||
+      dateString === 'null' ||
+      dateString === '' ||
+      dateString === '0000-00-00' ||
+      dateString === '1900-01-01' ||
+      dateString === '0001-01-01' 
+    ) {
       return null;
     }
-  }, []);
+
+    if (dateString instanceof Date) return dateString;
+
+    const raw = String(dateString).trim();
+
+    // --- ISO 8601 (with or without Z) ---
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) {
+      return new Date(raw);
+    }
+
+    // --- YYYY-MM-DD ---
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
+      const [y, m, d] = raw.split('-').map(Number);
+      return new Date(y, m - 1, d);
+    }
+
+    // --- DD/MM/YYYY ---
+    const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (dmy) {
+      const [, d, m, y] = dmy;
+      return new Date(Number(y), Number(m) - 1, Number(d));
+    }
+
+    // --- MMM DD YYYY hh:mmAM/PM (Nov 18 2024 12:25PM) ---
+    const ampm = raw.match(
+      /^[A-Za-z]{3}\s+\d{1,2}\s+\d{4}\s+\d{1,2}:\d{2}(AM|PM)$/i
+    );
+    if (ampm) {
+      const [mon, day, year, hm] = raw.split(/\s+/);
+      const [hStr, mStr] = hm.replace(/AM|PM/i, '').split(':');
+      const isPM = /PM$/i.test(hm);
+      const hour = (parseInt(hStr, 10) % 12) + (isPM ? 12 : 0);
+      const minute = parseInt(mStr, 10);
+      return new Date(`${mon} ${day} ${year} ${hour}:${minute}:00`);
+    }
+
+    // --- Native fallback ---
+    const nd = new Date(raw);
+    return isNaN(nd.getTime()) ? null : nd;
+  },
+  []
+);
+
+
 
   // FIXED: Define fetchUnitsFromAPI with proper error handling and state management
   const fetchUnitsFromAPI = useCallback(async (signal?: AbortSignal) => {
@@ -693,7 +651,7 @@ const Dashboard = () => {
       setAnnouncementError(null);
       
       // Use the Notice API parameters you provided
-      const valuesString = "@p_Notice_Id=NULL,@p_Society_Id=NULL,@p_Template_Id=NULL,@p_Reply_To_Email=NULL,@p_From_Expiry_Date=NULL,@p_To_Expiry_Date=NULL,@p_Include_Managers=NULL,@p_From_Publish_Date=NULL,@p_To_Publish_Date=NULL,@p_Brief_Description=NULL,@p_Detail_Descrption=NULL,@p_Notice_Recepient_Type=NULL,@p_Notice_Status_Id=NULL,@p_Is_Sms=NULL,@p_Is_Email=NULL,@p_Is_Whatsapp=NULL,@p_Attribute4=NULL,@p_Attribute5=NULL,@p_Attribute6=NULL,@p_Attribute7=NULL,@p_Attribute8=NULL,@p_Attribute9=NULL,@p_Attribute10=NULL,@p_Is_Active=NULL,@p_Is_Archived=NULL,@p_Skip=0,@p_Take=50000,@p_Pause=NULL,@p_Resume=NULL";
+      const valuesString = "@p_Notice_Id=NULL,@p_Society_Id=7,@p_Template_Id=NULL,@p_Reply_To_Email=NULL,@p_From_Expiry_Date=NULL,@p_To_Expiry_Date=NULL,@p_Include_Managers=NULL,@p_From_Publish_Date=NULL,@p_To_Publish_Date=NULL,@p_Brief_Description=NULL,@p_Detail_Descrption=NULL,@p_Notice_Recepient_Type=NULL,@p_Notice_Status_Id=NULL,@p_Is_Sms=NULL,@p_Is_Email=NULL,@p_Is_Whatsapp=NULL,@p_Attribute4=NULL,@p_Attribute5=NULL,@p_Attribute6=NULL,@p_Attribute7=NULL,@p_Attribute8=NULL,@p_Attribute9=NULL,@p_Attribute10=NULL,@p_Is_Active=NULL,@p_Is_Archived=NULL,@p_Skip=0,@p_Take=50000,@p_Pause=NULL,@p_Resume=NULL";
       
       const formBody = new URLSearchParams({
         AuthKey: "86A264E4-ECF8-4627-AF83-5512FE83DAE6",
@@ -802,7 +760,7 @@ const Dashboard = () => {
       const response = await axios.post(API_URL, formBody, {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         signal,
-        timeout: 15000, // Increased timeout
+        timeout: 40000, // Increased timeout
       });
 
       console.log("HelpDesk raw response:", response.data);
@@ -874,20 +832,17 @@ const Dashboard = () => {
       setLoadingHelpDesk(false);
     }
   }, []);
-
-  // FIXED: Comprehensive initial data loading function
+// FIXED: Comprehensive initial data loading function
   const initializeApp = useCallback(async () => {
     setIsInitialLoading(true);
     const controller = new AbortController();
     
     try {
-      console.log('🚀 Starting app initialization...');
-      
-      // Step 1: Fetch units first and wait for it to complete
-      const firstUnitId = await fetchUnitsFromAPI(controller.signal);
+     // Step 1: Fetch units first and wait for it to complete
+    const firstUnitId = await fetchUnitsFromAPI(controller.signal);
       
       if (firstUnitId && !controller.signal.aborted) {
-        console.log('✅ Units loaded, now fetching dependent data for unit:', firstUnitId);
+        console.log(' Units loaded, now fetching dependent data for unit:', firstUnitId);
         
         // Step 2: Fetch all dependent data in parallel using the first unit ID
         await Promise.allSettled([
@@ -896,13 +851,9 @@ const Dashboard = () => {
           fetchRecentVisitor(firstUnitId, controller.signal),
           fetchAnnouncements(controller.signal), // This doesn't depend on unit ID
         ]);
-        
-        console.log('✅ All dependent data fetching completed');
-      } else {
-        console.log('⚠️ No units available, fetching announcements only');
-        // Still fetch announcements even if no units
-        await fetchAnnouncements(controller.signal);
-      }
+        } else {
+         await fetchAnnouncements(controller.signal);
+ }
       
     } catch (error) {
       console.error('❌ App initialization error:', error);
@@ -914,16 +865,14 @@ const Dashboard = () => {
     return () => controller.abort();
   }, [fetchUnitsFromAPI, fetchUnitDetails, fetchHelpDeskTickets, fetchRecentVisitor, fetchAnnouncements]);
 
-  // FIXED: Main useEffect for app initialization
+ 
   useEffect(() => {
     initializeApp();
-  }, []); // Empty dependency array - only run once on mount
+  }, []); 
 
   // FIXED: Fetch payment/dashboard data separately
   const fetchDashboardData = useCallback(async () => {
     try {
-      // TODO: Replace with actual API calls
-      // Initialize with empty/default values
       setPaymentAmount(0);
       setIsPaid(false);
     } catch (error) {
@@ -1231,7 +1180,7 @@ const Dashboard = () => {
                 </View>
               )}
               {recentVisitor.checkin && (
-                <Text style={styles.checkoutText}>Check-in: {recentVisitor.checkin}</Text>
+                <Text style={styles.checkinText}>Check-in: {recentVisitor.checkin}</Text>
               )}
               {recentVisitor.checkout && (
                 <Text style={styles.checkoutText}>Check-out: {recentVisitor.checkout}</Text>
@@ -1320,11 +1269,19 @@ const Dashboard = () => {
           )}
 
           <TouchableOpacity
-            style={styles.lodgeTicketButton}
-            onPress={() => navigation.navigate("HelpDesk" as never)}
-          >
-            <Text style={styles.lodgeTicketText}>Lodge New Ticket</Text>
-          </TouchableOpacity>
+    style={styles.lodgeTicketButton}
+    onPress={() => navigation.navigate('HelpDesk' as never)}
+    activeOpacity={0.8}
+  >
+    <LinearGradient
+      colors={['#146070', '#03C174']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 0 }}
+      style={styles.gradientButton}
+    >
+      <Text style={styles.lodgeTicketText}>Lodge New Ticket</Text>
+    </LinearGradient>
+  </TouchableOpacity>
         </Card>
 
         {/* FIXED: Announcement Card with proper date formatting and most recent first sorting */}
@@ -1392,7 +1349,7 @@ const Dashboard = () => {
                       {/* FIXED: Announcement dates with proper error handling */}
                       {announcement?.Publish_Date && (
                         <Text style={styles.announcementDate}>
-                          Published: {formatDateTime(announcement.Publish_Date) || 'Date not available'}
+                          Published: {announcement.Publish_Date || 'Date not available'}
                         </Text>
                       )}
                       
@@ -1465,8 +1422,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: 12,
-    padding: 20,
-    marginBottom: 20,
+    padding: 15,
+    marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1672,7 +1629,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 12,
-    marginLeft: 10,
+    marginLeft: 9,
+    marginTop: -4,
   },
   tenantBadgeText: {
     color: '#fff',
@@ -1689,9 +1647,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666',
   },
+  checkinText: {
+    fontSize: 14,
+    color: '#167816ff',
+    marginTop: 5,
+  },
   checkoutText: {
     fontSize: 14,
-    color: '#999',
+    color: '#FF0000',
     marginTop: 5,
   },
   paymentRow: {
@@ -1764,18 +1727,24 @@ const styles = StyleSheet.create({
     color: "#1a9b8a",
     marginTop: 2,
   },
-  lodgeTicketButton: {
-    backgroundColor: '#1a9b8a',
-    paddingVertical: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  lodgeTicketText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
+ lodgeTicketButton: {
+  borderRadius: 8,
+  overflow: 'hidden', 
+  marginTop: 10,
+},
+
+gradientButton: {
+  paddingVertical: 11,
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderRadius: 8,
+},
+
+lodgeTicketText: {
+  color: '#fff',
+  fontSize: 16,
+  fontWeight: '600',
+},
   viewMoreButton: {
     borderWidth: 0.5,
     borderColor: '#1a9b8a',

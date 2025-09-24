@@ -18,12 +18,14 @@ import SpaceManagement from './Screens/ManagementScreen/UnitManagement';
 import OwnerManagement from './Screens/ManagementScreen/OwnerManagement';
 import OccupantList from './Screens/ManagementScreen/OccupantList';
 import AddOccupant from './Screens/AddButton/AddOccupant';
-import AddOwner from './Screens/AddButton/AddOwner';
+// import AddOwner from './Screens/AddButton/AddOwner';
 import AddTenant from './Screens/AddButton/AddTenant';
 import AddVisitor from './Screens/AddButton/AddVisitor';
 import CreateTicket from './Screens/AddButton/CreateTicket';
 import Header from './Components/Header';
 import TenantManagement from './Screens/ManagementScreen/TenantManagement';
+import FlashMessage from 'react-native-flash-message';
+
 
 const Stack = createStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -39,7 +41,7 @@ function DashboardStack({ onLogout }: { onLogout: () => void }) {
       }}
     >
       <Stack.Screen name="DashboardMain" component={Dashboard} />
-      <Stack.Screen name="AddOwner" component={AddOwner} />
+      {/* <Stack.Screen name="AddOwner" component={AddOwner} /> */}
       <Stack.Screen name="AddTenant" component={AddTenant} />
       <Stack.Screen name="AddOccupant" component={AddOccupant} />
       <Stack.Screen name="SpaceManagement" component={SpaceManagement} />
@@ -79,7 +81,7 @@ function ManageStack({ onLogout }: { onLogout: () => void }) {
       <Stack.Screen name="AddOccupant" component={AddOccupant} />
       <Stack.Screen name="TenantManagement" component={TenantManagement} />
       <Stack.Screen name="AddTenant" component={AddTenant} />
-      <Stack.Screen name="AddOwner" component={AddOwner} />
+      {/* <Stack.Screen name="AddOwner" component={AddOwner} /> */}
     </Stack.Navigator>
   );
 }
@@ -182,6 +184,7 @@ export default function App() {
         <NavigationContainer>
           <TabNavigator onLogout={handleLogout} />
         </NavigationContainer>
+        <FlashMessage position="top" floating />
       </SafeAreaProvider>
     );
   }

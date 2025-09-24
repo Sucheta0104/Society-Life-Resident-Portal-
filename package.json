@@ -9,7 +9,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/metro-runtime": "~5.0.4",
+    "@expo/metro-runtime": "~5.0.5",
     "@expo/vector-icons": "^14.1.0",
     "@react-native-async-storage/async-storage": "^2.1.2",
     "@react-native-community/datetimepicker": "^8.4.1",
@@ -21,7 +21,7 @@
     "@react-navigation/stack": "^7.4.7",
     "axios": "^1.11.0",
     "date-fns": "^4.1.0",
-    "expo": "53.0.22",
+    "expo": "~53.0.23",
     "expo-av": "~15.1.7",
     "expo-camera": "~16.1.11",
     "expo-constants": "~17.1.7",
@@ -37,8 +37,10 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-native": "0.79.5",
+    "react-native-flash-message": "^0.4.2",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-maps": "^1.20.1",
+    "react-native-modal-datetime-picker": "^18.0.0",
     "react-native-reanimated": "~3.17.4",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",

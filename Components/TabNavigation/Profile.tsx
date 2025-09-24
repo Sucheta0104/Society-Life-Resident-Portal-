@@ -194,7 +194,7 @@ const ProfileScreen = () => {
           />
 
           <MenuCard
-            icon={<MaterialIcons name="dashboard" size={24} color="#146070" />}
+            icon={<MaterialIcons name="dashboard" size={24} color="#05ae74" />}
             title="Unit Details"
             subtitle="View and manage unit information"
             onPress={handleSpaceDetails}
@@ -216,7 +216,7 @@ const ProfileScreen = () => {
           />
 
           <MenuCard
-            icon={<MaterialIcons name="security" size={24} color="#146070" />}
+            icon={<MaterialIcons name="security" size={24} color="#05ae74" />}
             title="Privacy & Security"
             subtitle="Control your privacy settings"
             onPress={handlePrivacySecurity}
@@ -230,7 +230,7 @@ const ProfileScreen = () => {
             onPress={handleHelpSupport}
           />
 
-          <TouchableOpacity style={[styles.menuCard, styles.logoutCard]} onPress={handleLogout}>
+          {/* <TouchableOpacity style={[styles.menuCard, styles.logoutCard]} onPress={handleLogout}>
             <View style={styles.menuIconContainer}>
               <View style={[styles.menuIcon, { backgroundColor: '#ff4444' + '20' }]}>
                 <MaterialIcons name="logout" size={24} color="#ff4444" />
@@ -241,7 +241,7 @@ const ProfileScreen = () => {
               <Text style={styles.menuSubtitle}>Sign out of your account</Text>
             </View>
             <MaterialIcons name="chevron-right" size={24} color="#ccc" />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
         </View>
       </ScrollView>
     </SafeAreaView>

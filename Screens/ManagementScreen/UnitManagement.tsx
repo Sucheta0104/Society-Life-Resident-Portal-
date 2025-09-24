@@ -5,7 +5,6 @@ import {
   TextInput,
   TouchableOpacity,
   FlatList,
-  Modal,
   ScrollView,
   StyleSheet,
   Dimensions,
@@ -44,17 +43,8 @@ export default function SpaceManagementApp() {
   const [filteredData, setFilteredData] = useState<UnitData[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
-  const [showFilters, setShowFilters] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
-  const [filters, setFilters] = useState({
-    floor: '',
-    minBuildArea: '',
-    maxBuildArea: '',
-    minCarpetArea: '',
-    maxCarpetArea: '',
-    owner: '',
-  });
 
   // API Configuration
   const API_CONFIG = {
@@ -275,42 +265,9 @@ export default function SpaceManagementApp() {
       );
     }
 
-    if (filters.floor) {
-      filtered = filtered.filter(item => item.floor?.toString() === filters.floor);
-    }
-    if (filters.minBuildArea) {
-      filtered = filtered.filter(item => (item.buildArea || 0) >= parseFloat(filters.minBuildArea));
-    }
-    if (filters.maxBuildArea) {
-      filtered = filtered.filter(item => (item.buildArea || 0) <= parseFloat(filters.maxBuildArea));
-    }
-    if (filters.minCarpetArea) {
-      filtered = filtered.filter(item => (item.carpetArea || 0) >= parseFloat(filters.minCarpetArea));
-    }
-    if (filters.maxCarpetArea) {
-      filtered = filtered.filter(item => (item.carpetArea || 0) <= parseFloat(filters.maxCarpetArea));
-    }
-    if (filters.owner) {
-      filtered = filtered.filter(item =>
-        item.owner?.toLowerCase().includes(filters.owner.toLowerCase())
-      );
-    }
-
     setFilteredData(filtered);
     setCurrentPage(1);
-  }, [searchQuery, filters, unitData]);
-
-  const clearFilters = () => {
-    setFilters({
-      floor: '',
-      minBuildArea: '',
-      maxBuildArea: '',
-      minCarpetArea: '',
-      maxCarpetArea: '',
-      owner: '',
-    });
-    setSearchQuery('');
-  };
+  }, [searchQuery, unitData]);
 
   const renderTableHeader = () => (
     <View style={styles.tableHeader}>
@@ -393,99 +350,6 @@ export default function SpaceManagementApp() {
     </View>
   );
 
-  const FilterModal = () => (
-    <Modal
-      visible={showFilters}
-      animationType="slide"
-      presentationStyle="pageSheet"
-      onRequestClose={() => setShowFilters(false)}
-    >
-      <SafeAreaView style={styles.modalContainer}>
-        <View style={styles.modalHeader}>
-          <Text style={styles.modalTitle}>Advanced Filters</Text>
-          <TouchableOpacity onPress={() => setShowFilters(false)}>
-            <Ionicons name="close" size={24} color="#333" />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Floor No</Text>
-            <TextInput
-              style={styles.filterInput}
-              value={filters.floor}
-              onChangeText={(text) => setFilters(prev => ({ ...prev, floor: text }))}
-              placeholder="Enter floor number"
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Build Area Range (Sqf)</Text>
-            <View style={styles.rangeInputContainer}>
-              <TextInput
-                style={[styles.filterInput, { flex: 1, marginRight: 8 }]}
-                value={filters.minBuildArea}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, minBuildArea: text }))}
-                placeholder="Min"
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[styles.filterInput, { flex: 1 }]}
-                value={filters.maxBuildArea}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, maxBuildArea: text }))}
-                placeholder="Max"
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Carpet Area Range (Sqf)</Text>
-            <View style={styles.rangeInputContainer}>
-              <TextInput
-                style={[styles.filterInput, { flex: 1, marginRight: 8 }]}
-                value={filters.minCarpetArea}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, minCarpetArea: text }))}
-                placeholder="Min"
-                keyboardType="numeric"
-              />
-              <TextInput
-                style={[styles.filterInput, { flex: 1 }]}
-                value={filters.maxCarpetArea}
-                onChangeText={(text) => setFilters(prev => ({ ...prev, maxCarpetArea: text }))}
-                placeholder="Max"
-                keyboardType="numeric"
-              />
-            </View>
-          </View>
-
-          <View style={styles.filterGroup}>
-            <Text style={styles.filterLabel}>Owner</Text>
-            <TextInput
-              style={styles.filterInput}
-              value={filters.owner}
-              onChangeText={(text) => setFilters(prev => ({ ...prev, owner: text }))}
-              placeholder="Enter owner name"
-            />
-          </View>
-        </ScrollView>
-
-        <View style={styles.modalFooter}>
-          <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
-            <Text style={styles.clearButtonText}>Clear All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.applyButton}
-            onPress={() => setShowFilters(false)}
-          >
-            <Text style={styles.applyButtonText}>Apply Filters</Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
-    </Modal>
-  );
-
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
@@ -547,12 +411,6 @@ export default function SpaceManagementApp() {
               <Ionicons name="close-circle" size={18} color="#6b7280" />
             </TouchableOpacity>
           )}
-          <TouchableOpacity
-            style={styles.filterButton}
-            onPress={() => setShowFilters(true)}
-          >
-            <Ionicons name="options" size={18} color="#2563eb" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -603,9 +461,6 @@ export default function SpaceManagementApp() {
 
       {/* Pagination */}
       {filteredData.length > 0 && renderPagination()}
-
-      {/* Filter Modal */}
-      <FilterModal />
     </SafeAreaView>
   );
 }
@@ -696,12 +551,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#ffffff',
-    borderRadius: 20,
+    borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1.5,
     borderColor: '#d1d5db',
-    height: 42,
+    height: 46,
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -719,10 +574,6 @@ const styles = StyleSheet.create({
     paddingVertical: 0,
     includeFontPadding: false,
     textAlignVertical: 'center',
-  },
-  filterButton: {
-    padding: 6,
-    marginLeft: 4,
   },
   clearSearchButton: {
     padding: 4,
@@ -860,85 +711,5 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#6b7280',
     textAlign: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#ffffff',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-  },
-  modalContent: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-  },
-  filterGroup: {
-    marginBottom: 20,
-  },
-  filterLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
-  filterInput: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    fontSize: 14,
-    backgroundColor: '#ffffff',
-  },
-  rangeInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  modalFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-  },
-  clearButton: {
-    flex: 1,
-    marginRight: 8,
-    paddingVertical: 12,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    alignItems: 'center',
-  },
-  clearButtonText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '600',
-  },
-  applyButton: {
-    flex: 1,
-    marginLeft: 8,
-    paddingVertical: 12,
-    borderRadius: 6,
-    backgroundColor: '#03C174',
-    alignItems: 'center',
-  },
-  applyButtonText: {
-    fontSize: 14,
-    color: '#ffffff',
-    fontWeight: '600',
   },
 });

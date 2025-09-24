@@ -336,30 +336,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   header: {
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 16,
   },
   mainTitle: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#146070',
-    letterSpacing: -0.5,
+    letterSpacing: -0.3,
   },
+
+  /* ===== Overview Card ===== */
   overviewCard: {
-    borderRadius: 16,
-    padding: 24,
-    marginBottom: 20,
+    borderRadius: 14,
+    padding: 18,
+    marginBottom: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     shadowColor: '#05ae74',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 3,
   },
   overviewItem: {
     alignItems: 'center',
@@ -367,36 +366,35 @@ const styles = StyleSheet.create({
   },
   overviewDivider: {
     width: 1,
-    height: 40,
+    height: 32,
     backgroundColor: '#05ae74',
     opacity: 0.2,
-    marginHorizontal: 8,
+    marginHorizontal: 6,
   },
   overviewNumber: {
-    fontSize: 23,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#146070',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   overviewLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#05ae74',
     textAlign: 'center',
     fontWeight: '500',
   },
+
+  /* ===== Generic Card ===== */
   card: {
-    backgroundColor: 'white',
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
     shadowColor: '#146070',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 5,
+    elevation: 3,
     borderWidth: 1,
     borderColor: '#f0f2f5',
   },
@@ -404,118 +402,132 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 20,
+    marginBottom: 14,
   },
   titleSection: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     flex: 1,
   },
+
+  /* ===== Icon ===== */
   iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 25,
+    height: 25,
+    borderRadius: 10,
     backgroundColor: '#f0f8f7',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: 10,
   },
+
+  /* ===== Title & Description ===== */
   titleContainer: {
     flex: 1,
   },
   cardTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: 'bold',
     color: '#146070',
-    marginBottom: 6,
-    letterSpacing: -0.3,
+    marginBottom: 4,
+    letterSpacing: -0.2,
   },
   cardDescription: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6b7280',
-    lineHeight: 18,
+    lineHeight: 16,
     fontWeight: '400',
   },
+
+  /* ===== Small Plus Button ===== */
   plusButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#f0f8f7',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#e0f2f1',
   },
+
+  /* ===== Stats ===== */
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 24,
-    paddingHorizontal: 8,
+    marginBottom: 20,
+    paddingHorizontal: 6,
   },
   statItem: {
     alignItems: 'center',
     flex: 1,
   },
   statNumber: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#146070',
-    marginBottom: 6,
+    marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
+    fontSize: 12,
     color: '#6b7280',
     fontWeight: '500',
     textAlign: 'center',
   },
+
+  /* ===== View All Button ===== */
   viewAllButtonContainer: {
-    borderRadius: 12,
+    borderRadius: 10,
     overflow: 'hidden',
   },
   viewAllButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
   },
   buttonIcon: {
-    marginRight: 8,
+    marginRight: 6,
   },
   viewAllText: {
-    color: 'white',
-    fontSize: 16,
+    color: '#fff',
+    fontSize: 14,
     fontWeight: '600',
     letterSpacing: 0.2,
   },
+
+  /* ===== Loading State ===== */
   loadingCard: {
     backgroundColor: '#f8f9fa',
   },
   loadingContent: {
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   loadingLine: {
-    height: 12,
+    height: 10,
     backgroundColor: '#e9ecef',
-    borderRadius: 6,
-    marginBottom: 8,
+    borderRadius: 5,
+    marginBottom: 6,
     width: '80%',
   },
   loadingStats: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginTop: 20,
-    marginBottom: 10,
+    marginTop: 14,
+    marginBottom: 8,
   },
   loadingStat: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     backgroundColor: '#e9ecef',
-    borderRadius: 20,
+    borderRadius: 16,
   },
+
   bottomPadding: {
-    height: 20,
+    height: 16,
   },
 });
+
 
 export default ManagementHub;
