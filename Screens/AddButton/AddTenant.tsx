@@ -19,7 +19,8 @@ import {
 import { LinearGradient } from 'expo-linear-gradient';
 import { useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { Ionicons } from '@expo/vector-icons';
+import * as DocumentPicker from 'expo-document-picker';
+import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import type { ReactNode } from 'react';
@@ -27,21 +28,29 @@ import type { ReactNode } from 'react';
 const { width: screenWidth } = Dimensions.get('window');
 
 type FormData = {
+  title: string;
   name: string;
   email: string;
   phone: string;
+  alternativePhone: string;
+  gender: string;
   dateOfBirth: string;
   nationalId: string;
+  aadharNumber: string;
+  panNumber: string;
+  religion: string;
   currentAddress: string;
   city: string;
   state: string;
   zipCode: string;
+  pincode: string;
   country: string;
   leaseStartDate: string;
   leaseEndDate: string;
   monthlyRent: string;
   securityDeposit: string;
   propertyUnit: string;
+  effectiveStartDate: string;
   emergencyName: string;
   emergencyPhone: string;
   emergencyRelation: string;
@@ -68,13 +77,42 @@ const countryCodes: CountryCode[] = [
   { code: '+33', flag: '🇫🇷', name: 'France' },
 ];
 
-// Sample data - replace with API calls when connected
+// Dropdown options
+const titles: DropdownOption[] = [
+  { label: 'Mr.', value: 'mr' },
+  { label: 'Mrs.', value: 'mrs' },
+  { label: 'Ms.', value: 'ms' },
+  { label: 'Dr.', value: 'dr' },
+  { label: 'Prof.', value: 'prof' },
+];
+
+const genders: DropdownOption[] = [
+  { label: 'Male', value: 'male' },
+  { label: 'Female', value: 'female' },
+  { label: 'Other', value: 'other' },
+];
+
+const religions: DropdownOption[] = [
+  { label: 'Hindu', value: 'hindu' },
+  { label: 'Muslim', value: 'muslim' },
+  { label: 'Christian', value: 'christian' },
+  { label: 'Sikh', value: 'sikh' },
+  { label: 'Buddhist', value: 'buddhist' },
+  { label: 'Jain', value: 'jain' },
+  { label: 'Other', value: 'other' },
+];
+
 const states: DropdownOption[] = [
   { label: 'Odisha', value: 'odisha' },
   { label: 'Delhi', value: 'delhi' },
   { label: 'Maharashtra', value: 'maharashtra' },
   { label: 'Karnataka', value: 'karnataka' },
   { label: 'Tamil Nadu', value: 'tamilnadu' },
+  { label: 'Gujarat', value: 'gujarat' },
+  { label: 'Rajasthan', value: 'rajasthan' },
+  { label: 'Punjab', value: 'punjab' },
+  { label: 'West Bengal', value: 'westbengal' },
+  { label: 'Uttar Pradesh', value: 'uttarpradesh' },
 ];
 
 const countries: DropdownOption[] = [
@@ -89,17 +127,24 @@ const AddTenantScreen = () => {
   const navigation = useNavigation();
   const [formData, setFormData] = useState<FormData>({
     // Personal Information
+    title: '',
     name: '',
     email: '',
     phone: '',
+    alternativePhone: '',
+    gender: '',
     dateOfBirth: '',
     nationalId: '',
+    aadharNumber: '',
+    panNumber: '',
+    religion: '',
     
     // Address Information
     currentAddress: '',
     city: '',
     state: '',
     zipCode: '',
+    pincode: '',
     country: '',
     
     // Lease Information
@@ -108,6 +153,7 @@ const AddTenantScreen = () => {
     monthlyRent: '',
     securityDeposit: '',
     propertyUnit: '',
+    effectiveStartDate: '',
     
     // Emergency Contact
     emergencyName: '',
@@ -119,12 +165,23 @@ const AddTenantScreen = () => {
   const [permission, requestPermission] = useCameraPermissions();
   const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
   const [selectedCountryCode, setSelectedCountryCode] = useState('+91');
+  const [alternativeCountryCode, setAlternativeCountryCode] = useState('+91');
   const [emergencyCountryCode, setEmergencyCountryCode] = useState('+91');
+  
+  // Modal states
   const [showCountryCodeModal, setShowCountryCodeModal] = useState(false);
+  const [showAlternativeCountryCodeModal, setShowAlternativeCountryCodeModal] = useState(false);
   const [showEmergencyCountryCodeModal, setShowEmergencyCountryCodeModal] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState<string | null>(null);
+  const [showImagePickerModal, setShowImagePickerModal] = useState(false);
+  
+  // Dropdown modal states
+  const [showTitleDropdown, setShowTitleDropdown] = useState(false);
+  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
+  const [showReligionDropdown, setShowReligionDropdown] = useState(false);
   const [showStateDropdown, setShowStateDropdown] = useState(false);
   const [showCountryDropdown, setShowCountryDropdown] = useState(false);
+  
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successAnimation] = useState(new Animated.Value(0));
 
@@ -158,12 +215,34 @@ const AddTenantScreen = () => {
       newErrors.email = true;
     }
     
+    // Phone validation
+    if (formData.phone && !/^\d{10}$/.test(formData.phone)) {
+      newErrors.phone = true;
+    }
+
+    // Aadhar validation
+    if (formData.aadharNumber && !/^\d{4}\s\d{4}\s\d{4}$/.test(formData.aadharNumber)) {
+      newErrors.aadharNumber = true;
+    }
+
+    // PAN validation
+    if (formData.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)) {
+      newErrors.panNumber = true;
+    }
+
+    // Pincode validation
+    if (formData.pincode && !/^\d{6}$/.test(formData.pincode)) {
+      newErrors.pincode = true;
+    }
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
+  // Image picker functions
   const takePicture = async () => {
-    // Check and request camera permission
+    setShowImagePickerModal(false);
+    
     if (!permission?.granted) {
       const permissionResult = await requestPermission();
       if (!permissionResult.granted) {
@@ -173,7 +252,7 @@ const AddTenantScreen = () => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -185,7 +264,8 @@ const AddTenantScreen = () => {
   };
 
   const pickFromGallery = async () => {
-    // Request media library permission
+    setShowImagePickerModal(false);
+    
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Permission Required', 'Gallery access permission is required.');
@@ -193,7 +273,7 @@ const AddTenantScreen = () => {
     }
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.8,
@@ -204,16 +284,29 @@ const AddTenantScreen = () => {
     }
   };
 
+  const pickDocument = async () => {
+    setShowImagePickerModal(false);
+
+    try {
+      const result: any = await DocumentPicker.getDocumentAsync({
+        type: ['image/*'],
+        copyToCacheDirectory: true,
+      });
+
+      if (result.type === 'success') {
+        if (result.size && result.size > 5000000) {
+          Alert.alert('Error', 'File size too large. Please select a file smaller than 5MB.');
+          return;
+        }
+        setProfileImage(result.uri);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to pick document');
+    }
+  };
+
   const showImagePickerOptions = () => {
-    Alert.alert(
-      'Select Image',
-      'Choose how you would like to add a photo',
-      [
-        { text: 'Camera', onPress: takePicture },
-        { text: 'Gallery', onPress: pickFromGallery },
-        { text: 'Cancel', style: 'cancel' },
-      ]
-    );
+    setShowImagePickerModal(true);
   };
 
   const handleDateChange = (event: any, selectedDate?: Date, field?: string) => {
@@ -276,6 +369,7 @@ const AddTenantScreen = () => {
         value={formData[field]}
         onChangeText={(value) => handleInputChange(field, value)}
         keyboardType="phone-pad"
+        maxLength={10}
       />
       
       <Modal
@@ -396,7 +490,8 @@ const AddTenantScreen = () => {
     field: keyof FormData,
     keyboardType: KeyboardTypeOptions = 'default',
     multiline: boolean = false,
-    required: boolean = false
+    required: boolean = false,
+    maxLength?: number
   ) => (
     <View style={styles.inputContainer}>
       <Text style={styles.inputLabel}>
@@ -412,13 +507,40 @@ const AddTenantScreen = () => {
         placeholder={placeholder}
         placeholderTextColor="#666"
         value={formData[field]}
-        onChangeText={(value) => handleInputChange(field, value)}
+        onChangeText={(value) => {
+          let processedValue = value;
+          
+          // Special formatting for Aadhar number
+          if (field === 'aadharNumber') {
+            const cleaned = value.replace(/\s/g, '');
+            processedValue = cleaned.replace(/(.{4})(.{4})(.{4})/, '$1 $2 $3');
+          }
+          // Special formatting for PAN number
+          else if (field === 'panNumber') {
+            processedValue = value.toUpperCase();
+          }
+          
+          handleInputChange(field, processedValue);
+        }}
         keyboardType={keyboardType}
         multiline={multiline}
         numberOfLines={multiline ? 3 : 1}
+        maxLength={maxLength}
+        autoCapitalize={
+          field === 'email' ? 'none' : 
+          field === 'panNumber' ? 'characters' : 
+          'words'
+        }
       />
       {errors[field] && (
-        <Text style={styles.errorText}>This field is required</Text>
+        <Text style={styles.errorText}>
+          {field === 'email' && 'Please enter a valid email address'}
+          {field === 'phone' && 'Please enter a valid 10-digit phone number'}
+          {field === 'aadharNumber' && 'Please enter a valid Aadhar number (1234 5678 9012)'}
+          {field === 'panNumber' && 'Please enter a valid PAN number (ABCDE1234F)'}
+          {field === 'pincode' && 'Please enter a valid 6-digit pincode'}
+          {!['email', 'phone', 'aadharNumber', 'panNumber', 'pincode'].includes(field) && 'This field is required'}
+        </Text>
       )}
     </View>
   );
@@ -428,6 +550,52 @@ const AddTenantScreen = () => {
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>
+  );
+
+  // Image Picker Modal Component
+  const ImagePickerModal = () => (
+    <Modal
+      visible={showImagePickerModal}
+      transparent
+      animationType="fade"
+      onRequestClose={() => setShowImagePickerModal(false)}
+    >
+      <View style={styles.imagePickerModalOverlay}>
+        <View style={styles.imagePickerModalContainer}>
+          <Text style={styles.imagePickerModalTitle}>Select Photo Option</Text>
+          
+          <View style={styles.imagePickerOptionsContainer}>
+            <TouchableOpacity style={styles.imagePickerOption} onPress={takePicture}>
+              <View style={styles.imagePickerOptionIconContainer}>
+                <MaterialIcons name="camera-alt" size={24} color="#146070" />
+              </View>
+              <Text style={styles.imagePickerOptionText}>Take Photo</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.imagePickerOption} onPress={pickFromGallery}>
+              <View style={styles.imagePickerOptionIconContainer}>
+                <MaterialIcons name="photo-library" size={24} color="#146070" />
+              </View>
+              <Text style={styles.imagePickerOptionText}>Choose from Gallery</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.imagePickerOption} onPress={pickDocument}>
+              <View style={styles.imagePickerOptionIconContainer}>
+                <MaterialIcons name="insert-drive-file" size={24} color="#146070" />
+              </View>
+              <Text style={styles.imagePickerOptionText}>Pick Image File</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.imagePickerCancelButton} 
+            onPress={() => setShowImagePickerModal(false)}
+          >
+            <Text style={styles.imagePickerCancelText}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 
   const SuccessModal = () => (
@@ -476,7 +644,7 @@ const AddTenantScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
       
-      {/* Updated Header without background */}
+      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -488,29 +656,56 @@ const AddTenantScreen = () => {
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
-        {/* Profile Picture Section */}
-        <View style={styles.profileSection}>
-          <TouchableOpacity style={styles.profileImageContainer} onPress={showImagePickerOptions}>
-            {profileImage ? (
-              <Image source={{ uri: profileImage }} style={styles.profileImage} />
-            ) : (
-              <View style={styles.placeholderImage}>
-                <Ionicons name="camera" size={40} color="#146070" />
-                <Text style={styles.placeholderText}>Add Photo</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+        {/* Profile Picture Section - Updated Design */}
+        {renderSectionCard(
+          'Profile Photo',
+          <View style={styles.photoContainer}>
+            <TouchableOpacity 
+              style={[
+                styles.photoUploadContainer,
+                profileImage && styles.photoUploadWithImage
+              ]} 
+              onPress={showImagePickerOptions}
+            >
+              {profileImage ? (
+                <View style={styles.photoPreview}>
+                  <Image source={{ uri: profileImage }} style={styles.previewImage} />
+                  <Text style={styles.changePhotoText}>Tap to change photo</Text>
+                </View>
+              ) : (
+                <View style={styles.photoUploadContent}>
+                  <MaterialIcons name="camera-alt" size={40} color="#03C174" />
+                  <Text style={styles.photoUploadText}>Upload Photo</Text>
+                  <Text style={styles.photoUploadSubtext}>
+                    Accepted file types: PNG, JPG, JPEG (Max 5MB)
+                  </Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Personal Information */}
         {renderSectionCard(
           'Personal Information',
           <>
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Title</Text>
+              {renderDropdown('Select Title', 'title', titles, showTitleDropdown, setShowTitleDropdown)}
+            </View>
+            
             {renderInputField('Full Name', 'name', 'default', false, true)}
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Gender <Text style={styles.requiredAsterisk}>*</Text></Text>
+              {renderDropdown('Select Gender', 'gender', genders, showGenderDropdown, setShowGenderDropdown)}
+            </View>
+
             {renderInputField('Email Address', 'email', 'email-address', false, true)}
+            
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>
-                Phone Number<Text style={styles.requiredAsterisk}> *</Text>
+                Contact Number<Text style={styles.requiredAsterisk}> *</Text>
               </Text>
               {renderPhoneInput(
                 'Phone Number',
@@ -521,14 +716,34 @@ const AddTenantScreen = () => {
                 setShowCountryCodeModal
               )}
               {errors.phone && (
-                <Text style={styles.errorText}>This field is required</Text>
+                <Text style={styles.errorText}>Please enter a valid 10-digit phone number</Text>
               )}
             </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Alternative Contact Number</Text>
+              {renderPhoneInput(
+                'Alternative Phone',
+                'alternativePhone',
+                alternativeCountryCode,
+                setAlternativeCountryCode,
+                showAlternativeCountryCodeModal,
+                setShowAlternativeCountryCodeModal
+              )}
+            </View>
+
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Date of Birth</Text>
-              {renderDateInput('Date of Birth', 'dateOfBirth')}
+              {renderDateInput('Select Date of Birth', 'dateOfBirth')}
             </View>
-            {renderInputField('National ID/SSN', 'nationalId')}
+
+            {renderInputField('Aadhar Number', 'aadharNumber', 'numeric', false, false, 14)}
+            {renderInputField('PAN Number', 'panNumber', 'default', false, false, 10)}
+            
+            <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Religion</Text>
+              {renderDropdown('Select Religion', 'religion', religions, showReligionDropdown, setShowReligionDropdown)}
+            </View>
           </>
         )}
 
@@ -540,12 +755,13 @@ const AddTenantScreen = () => {
             {renderInputField('City', 'city')}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>State</Text>
-              {renderDropdown('State', 'state', states, showStateDropdown, setShowStateDropdown)}
+              {renderDropdown('Select State', 'state', states, showStateDropdown, setShowStateDropdown)}
             </View>
-            {renderInputField('ZIP Code', 'zipCode', 'numeric')}
+            {renderInputField('ZIP Code', 'zipCode', 'numeric', false, false, 6)}
+            {renderInputField('Pincode', 'pincode', 'numeric', false, false, 6)}
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Country</Text>
-              {renderDropdown('Country', 'country', countries, showCountryDropdown, setShowCountryDropdown)}
+              {renderDropdown('Select Country', 'country', countries, showCountryDropdown, setShowCountryDropdown)}
             </View>
           </>
         )}
@@ -555,12 +771,16 @@ const AddTenantScreen = () => {
           'Lease Information',
           <>
             <View style={styles.inputContainer}>
+              <Text style={styles.inputLabel}>Effective Start Date</Text>
+              {renderDateInput('Select Start Date', 'effectiveStartDate')}
+            </View>
+            <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Lease Start Date</Text>
-              {renderDateInput('Lease Start Date', 'leaseStartDate')}
+              {renderDateInput('Select Lease Start Date', 'leaseStartDate')}
             </View>
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Lease End Date</Text>
-              {renderDateInput('Lease End Date', 'leaseEndDate')}
+              {renderDateInput('Select Lease End Date', 'leaseEndDate')}
             </View>
             {renderInputField('Monthly Rent (₹)', 'monthlyRent', 'numeric')}
             {renderInputField('Security Deposit (₹)', 'securityDeposit', 'numeric')}
@@ -608,6 +828,7 @@ const AddTenantScreen = () => {
         <View style={styles.bottomPadding} />
       </ScrollView>
 
+      <ImagePickerModal />
       <SuccessModal />
     </SafeAreaView>
   );
@@ -619,11 +840,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
   },
   header: {
-    paddingVertical: 10,
-    paddingHorizontal: 10,
-    backgroundColor: '#f5f5f5',
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
     borderBottomWidth: 1,
-    borderBottomColor: '#e9ecef',
+    borderBottomColor: '#e0e0e0',
   },
   headerContent: {
     flexDirection: 'row',
@@ -647,38 +868,6 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
   },
-  profileSection: {
-    alignItems: 'center',
-    marginVertical: 20,
-  },
-  profileImageContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: 'white',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-  },
-  profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-  },
-  placeholderImage: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    color: '#666',
-    fontSize: 12,
-    marginTop: 5,
-    fontWeight: '600',
-  },
   sectionCard: {
     backgroundColor: 'white',
     borderRadius: 12,
@@ -695,7 +884,61 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#146070',
     marginBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    paddingBottom: 8,
   },
+
+  // Photo Upload Styles
+  photoContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  photoUploadContainer: {
+    width: '100%',
+    height: 200,
+    borderWidth: 2,
+    borderColor: '#03C174',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f0fff4',
+  },
+  photoUploadWithImage: {
+    borderStyle: 'solid',
+  },
+  photoUploadContent: {
+    alignItems: 'center',
+  },
+  photoPreview: {
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: 10,
+  },
+  changePhotoText: {
+    fontSize: 14,
+    color: '#03C174',
+    fontWeight: '500',
+  },
+  photoUploadText: {
+    fontSize: 16,
+    color: '#03C174',
+    fontWeight: '600',
+    marginTop: 8,
+  },
+  photoUploadSubtext: {
+    fontSize: 12,
+    color: '#888',
+    textAlign: 'center',
+    marginTop: 4,
+  },
+
+  // Form Input Styles
   inputContainer: {
     marginBottom: 15,
   },
@@ -735,6 +978,8 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top',
     paddingTop: 12,
   },
+
+  // Phone Input Styles
   phoneContainer: {
     flexDirection: 'row',
     backgroundColor: '#f8f9fa',
@@ -763,6 +1008,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     height: 48,
   },
+
+  // Dropdown Styles
   dropdownContainer: {
     backgroundColor: '#f8f9fa',
     borderRadius: 8,
@@ -784,6 +1031,11 @@ const styles = StyleSheet.create({
     color: '#333',
     flex: 1,
   },
+  placeholderText: {
+    color: '#999',
+  },
+
+  // Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -808,6 +1060,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
+
+  // Country Code Modal Styles
   countryCodeItem: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -829,6 +1083,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
   },
+
+  // Dropdown Item Styles
   dropdownItem: {
     paddingHorizontal: 20,
     paddingVertical: 15,
@@ -839,6 +1095,75 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+
+  // Image Picker Modal Styles
+  imagePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imagePickerModalContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    width: '85%',
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 8,
+  },
+  imagePickerModalTitle: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  imagePickerOptionsContainer: {
+    gap: 16,
+    marginBottom: 24,
+  },
+  imagePickerOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  imagePickerOptionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 8,
+    backgroundColor: '#e8f4f8',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  imagePickerOptionText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#333',
+    flex: 1,
+  },
+  imagePickerCancelButton: {
+    paddingVertical: 14,
+    backgroundColor: '#ffebee',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  imagePickerCancelText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#d32f2f',
+  },
+
+  // Button Styles
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -874,6 +1199,8 @@ const styles = StyleSheet.create({
   bottomPadding: {
     height: 30,
   },
+
+  // Success Modal Styles
   successModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',

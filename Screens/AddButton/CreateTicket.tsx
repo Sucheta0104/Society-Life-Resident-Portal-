@@ -23,6 +23,7 @@ const API_CONFIG = {
   hostKey: '8ECB211D2',
 };
 
+
 type FormData = {
   unitNumber: string;
   unitNumberId: string;
@@ -182,11 +183,6 @@ const CreateHelpTicket = () => {
         setCategoryOptions(categoryData);
         setPriorityOptions(priorityData);
         setServiceTypeOptions(serviceTypeData);
-
-        // console.log(' All dropdown data loaded successfully');
-        // console.log(' Categories:', categoryData.length);
-        // console.log(' Priorities:', priorityData.length);
-        // console.log(' Service Types:', serviceTypeData.length);
 
       } catch (error) {
         console.error('❌ Error loading dropdown data:', error);
@@ -526,32 +522,11 @@ const CreateHelpTicket = () => {
       </View>
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+        
         <View style={styles.content}>
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>Ticket Details</Text>
-
-            {renderDropdownField('unitNumber', 'Unit Number', unitNumberOptions)}
-            {renderDropdownField('category', 'Category', categoryOptions, loadingStates.category)}
-            {renderDropdownField('priority', 'Priority', priorityOptions, loadingStates.priority)}
-            {renderDropdownField('requestBy', 'Request By', requestByOptions)}
-            {renderDropdownField('serviceType', 'Service Type', serviceTypeOptions, loadingStates.serviceType)}
-
-            <Text style={styles.label}>Description</Text>
-            <TextInput
-              style={styles.textArea}
-              multiline
-              numberOfLines={4}
-              placeholder="Enter description..."
-              placeholderTextColor="#999"
-              value={formData.description}
-              onChangeText={text => setFormData(prev => ({ ...prev, description: text }))}
-              textAlignVertical="top"
-            />
-          </View>
-
-          <View style={styles.card}>
             <Text style={styles.attachmentTitle}>
-              Attach images/documents <Text style={styles.required}>*</Text>
+              Upload Images <Text style={styles.required}>*</Text>
             </Text>
 
             <View style={styles.attachmentContainer}>
@@ -591,6 +566,29 @@ const CreateHelpTicket = () => {
               </View>
             )}
           </View>
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Ticket Details</Text>
+
+            {renderDropdownField('unitNumber', 'Unit Number', unitNumberOptions)}
+            {renderDropdownField('category', 'Category', categoryOptions, loadingStates.category)}
+            {renderDropdownField('priority', 'Priority', priorityOptions, loadingStates.priority)}
+            {renderDropdownField('requestBy', 'Request By', requestByOptions)}
+            {renderDropdownField('serviceType', 'Service Type', serviceTypeOptions, loadingStates.serviceType)}
+
+            <Text style={styles.label}>Description</Text>
+            <TextInput
+              style={styles.textArea}
+              multiline
+              numberOfLines={4}
+              placeholder="Enter description..."
+              placeholderTextColor="#999"
+              value={formData.description}
+              onChangeText={text => setFormData(prev => ({ ...prev, description: text }))}
+              textAlignVertical="top"
+            />
+          </View>
+
+          
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity style={styles.resetButton} onPress={resetForm}>
@@ -920,7 +918,7 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: 16,
+    gap: 18,
     marginTop: 20,
     marginBottom: 40,
   },
@@ -928,7 +926,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#6c757d',
     borderRadius: 8,
-    padding: 16,
+    padding: 15,
     alignItems: 'center',
   },
   resetButtonText: {

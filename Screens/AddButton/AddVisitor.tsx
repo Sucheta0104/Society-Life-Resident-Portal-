@@ -13,6 +13,7 @@ import {
   Modal,
   ActivityIndicator,
   Animated,
+  Alert,
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -21,11 +22,18 @@ import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
 import { useNavigation } from '@react-navigation/native';
 
+
 // API Configuration
 const API_CONFIG = {
   url: 'https://applianceservicemgmt.dev2stage.in/api/rest/Invoke',
   authKey: '86A264E4-ECF8-4627-AF83-5512FE83DAE6',
   hostKey: '8ECB211D2',
+};
+
+// Image Upload Configuration
+const IMAGE_UPLOAD_CONFIG = {
+  url: 'https://cp.societylife.itpluspoint.in/api/image/upload-image',
+  folderName: 'Visitor_FolderPath' // You can change this folder name as needed
 };
 
 interface DropdownOption {
@@ -35,6 +43,7 @@ interface DropdownOption {
 
 interface VisitorFormData {
   photo: string | null;
+  photoUrl: string | null; // Add this to store the uploaded image URL
   firstName: string;
   lastName: string;
   gender: string;
@@ -113,6 +122,7 @@ const AddVisitor: React.FC = () => {
   
   const [formData, setFormData] = useState<VisitorFormData>({
     photo: null,
+    photoUrl: null,
     firstName: '',
     lastName: '',
     gender: '',
@@ -157,11 +167,99 @@ const AddVisitor: React.FC = () => {
   const [loadingGender, setLoadingGender] = useState(false);
   const [loadingRelations, setLoadingRelations] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false); // Add this state
   const [successAnimation] = useState(new Animated.Value(0));
   const [errorAnimation] = useState(new Animated.Value(0));
   const [infoAnimation] = useState(new Animated.Value(0));
   const [resetAnimation] = useState(new Animated.Value(0));
   const [modalData, setModalData] = useState({ title: '', message: '' });
+
+  // Image Upload Function
+const uploadImageToServer = async (
+  imageUri: string
+): Promise<{ success: boolean; url?: string; fileName?: string; error?: string }> => {
+  try {
+    setIsUploadingImage(true);
+    console.log("📸 Starting image upload...");
+
+    // Check if file exists
+    const fileInfo = await FileSystem.getInfoAsync(imageUri);
+    if (!fileInfo.exists) {
+      return { success: false, error: "Image file not found" };
+    }
+
+    // Extract file extension
+    const fileExt = imageUri.split(".").pop()?.toLowerCase() || "jpg";
+    const fileName = `visitor_${Date.now()}.${fileExt}`;
+    const mimeType = fileExt === "png" ? "image/png" : "image/jpeg";
+
+    // Build form data
+    const formData = new FormData();
+    formData.append("file", {
+      uri: imageUri,
+      name: fileName,
+      type: mimeType,
+    } as any);
+
+    // Build upload URL with query param (same as axios version)
+    const uploadUrl = `${IMAGE_UPLOAD_CONFIG.url}?imageFolderName=${encodeURIComponent(
+      IMAGE_UPLOAD_CONFIG.folderName
+    )}`;
+
+    console.log("📸 Uploading to:", uploadUrl);
+
+    // Perform upload with fetch
+    const response = await fetch(uploadUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+      body: formData,
+    });
+
+    const responseText = await response.text();
+    console.log("📸 Upload response (raw):", responseText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${responseText}`);
+    }
+
+    let result: any;
+    try {
+      result = JSON.parse(responseText);
+    } catch {
+      // Handle plain string response (filename only)
+      if (responseText.includes(".")) {
+        console.log("✅ Image uploaded successfully:", responseText);
+        return { success: true, fileName: responseText };
+      }
+      return { success: false, error: "Invalid response format from server" };
+    }
+
+    // Handle JSON response
+    if (result.FileName) {
+      console.log("✅ Image uploaded successfully:", result.FileName);
+      return {
+        success: true,
+        url: result.Url,
+        fileName: result.FileName,
+      };
+    }
+
+    return { success: false, error: "Upload response missing filename" };
+  } catch (error: any) {
+    console.error("❌ Image upload failed:", error.message || error);
+    return {
+      success: false,
+      error: error.message || "Failed to upload image",
+    };
+  } finally {
+    setIsUploadingImage(false);
+  }
+};
+
+
+
 
   // Custom Success Modal with Auto-Hide Animation
   const showSuccessAlert = () => {
@@ -184,6 +282,7 @@ const AddVisitor: React.FC = () => {
       // Reset form data
       setFormData({
         photo: null,
+        photoUrl: null,
         firstName: '',
         lastName: '',
         gender: '',
@@ -470,6 +569,7 @@ const AddVisitor: React.FC = () => {
                     // Reset form
                     setFormData({
                       photo: null,
+                      photoUrl: null,
                       firstName: '',
                       lastName: '',
                       gender: '',
@@ -542,19 +642,6 @@ const AddVisitor: React.FC = () => {
     }
   };
 
-  // Convert image to base64
-  const convertImageToBase64 = async (uri: string): Promise<string | null> => {
-    try {
-      const base64 = await FileSystem.readAsStringAsync(uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
-      return base64;
-    } catch (error) {
-      console.error('Error converting image to base64:', error);
-      return null;
-    }
-  };
-
   // Utility function to escape SQL strings
   const escapeSQLString = (str: string): string => {
     if (!str) return '';
@@ -574,13 +661,20 @@ const AddVisitor: React.FC = () => {
     try {
       setIsSubmitting(true);
 
-      // Convert photo to base64 if exists
-      let photoBase64 = null;
+      // Upload image first if exists
+      let uploadedImageUrl: string | null = null;
       if (formData.photo) {
-        photoBase64 = await convertImageToBase64(formData.photo);
-        // Limit base64 size to prevent server errors
-        if (photoBase64 && photoBase64.length > 1500000) {
-          showCustomError('Error', 'Image size too large. Please select a smaller image.');
+        showCustomInfo('Uploading', 'Uploading image, please wait...');
+        const uploadResult = await uploadImageToServer(formData.photo);
+        
+        if (uploadResult.success && uploadResult.fileName) {   
+    uploadedImageUrl = uploadResult.fileName; 
+          console.log('✅ Image uploaded successfully:', uploadedImageUrl);
+          
+          // Update form data with uploaded image URL
+          setFormData(prev => ({ ...prev, photoUrl: uploadedImageUrl }));
+        } else {
+          showCustomError('Image Upload Failed', uploadResult.error || 'Failed to upload image');
           return false;
         }
       }
@@ -629,7 +723,7 @@ const AddVisitor: React.FC = () => {
         formData.expectedDuration ? `'${escapeSQLString(formData.expectedDuration.trim())}'` : 'NULL', // 33. @p_Attribute8 - Duration
         formData.emergencyContactName ? `'${escapeSQLString(formData.emergencyContactName.trim())}'` : 'NULL', // 34. @p_Attribute9 - Emergency Contact
         formData.emergencyContactNumber ? `'${formData.emergencyContactNumber.trim()}'` : 'NULL', // 35. @p_Attribute10 - Emergency Number
-        photoBase64 ? `'${photoBase64}'` : 'NULL', // 36. @p_Visitor_Photo
+        uploadedImageUrl ? `'${uploadedImageUrl}'` : 'NULL', // 36. @p_Visitor_Photo - Use uploaded image URL
         '1', // 37. @p_Created_By - hardcoded user ID
       ];
 
@@ -646,12 +740,13 @@ const AddVisitor: React.FC = () => {
       console.log(' Visitor:', visitorName);
       console.log(' Contact:', formData.contactNumber);
       console.log(' Email:', formData.email);
-      console.log(' City:', formData.city);
-      console.log(' State:', formData.state, `(ID: ${formData.stateValue})`);
-      console.log(' Country:', formData.country, `(ID: ${formData.countryValue})`);
-      console.log(' Host:', formData.hostName);
-      console.log('Unit:', formData.hostUnit);
-      console.log('Purpose:', formData.purposeOfVisit);
+      console.log('🏙️ City:', formData.city);
+      console.log('🗺️ State:', formData.state, `(ID: ${formData.stateValue})`);
+      console.log('🌍 Country:', formData.country, `(ID: ${formData.countryValue})`);
+      console.log('🏠 Host:', formData.hostName);
+      console.log('🏢 Unit:', formData.hostUnit);
+      console.log('📝 Purpose:', formData.purposeOfVisit);
+      console.log('🖼️ Photo URL:', uploadedImageUrl || 'No photo');
 
       const response = await fetch(API_CONFIG.url, {
         method: 'POST',
@@ -772,7 +867,7 @@ const AddVisitor: React.FC = () => {
     });
   }, []);
 
-  // Photo handling
+  // Photo handling with improved upload integration
   const handleImagePicker = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
@@ -791,28 +886,28 @@ const AddVisitor: React.FC = () => {
     }
 
     const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
+      quality: 0.8,
     });
 
-    if (!result.canceled) {
-      updateFormData('photo', result.assets?.[0]?.uri ?? null);
+    if (!result.canceled && result.assets?.[0]) {
+      updateFormData('photo', result.assets[0].uri);
     }
   };
 
   const openGallery = async () => {
     setShowPhotoModal(false);
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ['images'],
       allowsEditing: true,
       aspect: [1, 1],
-      quality: 0.6,
+      quality: 0.8,
     });
 
-    if (!result.canceled) {
-      updateFormData('photo', result.assets?.[0]?.uri ?? null);
+    if (!result.canceled && result.assets?.[0]) {
+      updateFormData('photo', result.assets[0].uri);
     }
   };
 
@@ -820,21 +915,16 @@ const AddVisitor: React.FC = () => {
     setShowPhotoModal(false);
 
     try {
-      // Cast result to any to avoid TS errors
       const result: any = await DocumentPicker.getDocumentAsync({
         type: ['image/*'],
         copyToCacheDirectory: true,
       });
 
-      // Check if user picked a document successfully
       if (result.type === 'success') {
-        // size may be undefined, so we check safely
         if (result.size && result.size > 5000000) {
           showCustomError('Error', 'File size too large. Please select a file smaller than 5MB.');
           return;
         }
-
-        // Use the file URI
         updateFormData('photo', result.uri);
       }
     } catch (error) {
@@ -945,10 +1035,6 @@ const AddVisitor: React.FC = () => {
             showCustomInfo('Loading', 'Please wait while gender options are loading...');
             return;
           }
-          // if (genderOptions.length === 0) {
-          //   showCustomError('Error', 'No gender options available. Please try again later.');
-          //   return;
-          // }
           setShowGenderModal(true);
         }}
         disabled={loadingGender}
@@ -1249,11 +1335,13 @@ const AddVisitor: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       {/* Loading Overlay */}
-      {isSubmitting && (
+      {(isSubmitting || isUploadingImage) && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingModal}>
             <ActivityIndicator size="large" color="#146070" />
-            <Text style={styles.loadingModalText}>Saving...</Text>
+            <Text style={styles.loadingModalText}>
+              {isUploadingImage ? 'Uploading Image...' : 'Saving...'}
+            </Text>
             <Text style={styles.loadingModalSubText}>Please wait</Text>
           </View>
         </View>
@@ -1283,6 +1371,9 @@ const AddVisitor: React.FC = () => {
                   </>
                 )}
               </TouchableOpacity>
+              {formData.photoUrl && (
+                <Text style={styles.uploadSuccessText}>✅ Photo will be uploaded to server</Text>
+              )}
             </View>
           </SectionCard>
 
@@ -1417,20 +1508,20 @@ const AddVisitor: React.FC = () => {
 
           <View style={styles.buttonContainer}>
             <TouchableOpacity 
-              style={[styles.resetButton, isSubmitting && styles.disabledButton]} 
+              style={[styles.resetButton, (isSubmitting || isUploadingImage) && styles.disabledButton]} 
               onPress={handleReset}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
             >
               <Text style={styles.resetButtonText}>Reset</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={[styles.saveButton, isSubmitting && styles.disabledButton]} 
+              style={[styles.saveButton, (isSubmitting || isUploadingImage) && styles.disabledButton]} 
               onPress={handleSave}
-              disabled={isSubmitting}
+              disabled={isSubmitting || isUploadingImage}
             >
               <LinearGradient colors={['#146070', '#03C174']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.saveButtonGradient}>
                 <Text style={styles.saveButtonText}>
-                  {isSubmitting ? 'Saving...' : 'Save'}
+                  {isSubmitting ? 'Saving...' : isUploadingImage ? 'Uploading...' : 'Save'}
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
@@ -1545,6 +1636,13 @@ const styles = StyleSheet.create({
     color: '#999',
     textAlign: 'center',
     marginTop: 4,
+  },
+  uploadSuccessText: {
+    fontSize: 12,
+    color: '#03C174',
+    textAlign: 'center',
+    marginTop: 8,
+    fontWeight: '500',
   },
   inputContainer: {
     marginBottom: 16,
