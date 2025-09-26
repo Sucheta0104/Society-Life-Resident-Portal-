@@ -9,11 +9,10 @@ import {
   Modal,
   Animated,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '@react-navigation/native';
 
 // API Configuration
@@ -22,7 +21,6 @@ const API_CONFIG = {
   authKey: '86A264E4-ECF8-4627-AF83-5512FE83DAE6',
   hostKey: '8ECB211D2',
 };
-
 
 type FormData = {
   unitNumber: string;
@@ -43,11 +41,6 @@ type DropdownOption = {
   Value: string;
 };
 
-// Fix Attachment type for name property
-type Attachment =
-  | (ImagePicker.ImagePickerAsset & { name?: string })
-  | DocumentPicker.DocumentPickerAsset;
-
 const CreateHelpTicket = () => {
   const navigation = useNavigation();
 
@@ -65,20 +58,11 @@ const CreateHelpTicket = () => {
     description: '',
   });
 
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-
   // API dropdown options
   const [categoryOptions, setCategoryOptions] = useState<DropdownOption[]>([]);
   const [priorityOptions, setPriorityOptions] = useState<DropdownOption[]>([]);
   const [serviceTypeOptions, setServiceTypeOptions] = useState<DropdownOption[]>([]);
-  
-  // Static dropdown options
-  const unitNumberOptions: DropdownOption[] = [
-    { Text: 'Unit E305', Value: '101' },
-    { Text: 'Unit 102', Value: '102' },
-    { Text: 'Unit 103', Value: '103' },
-    { Text: 'Unit 104', Value: '104' },
-  ];
+  const [unitNumberOptions, setUnitNumberOptions] = useState<DropdownOption[]>([]);
 
   const requestByOptions: DropdownOption[] = [
     { Text: 'Self', Value: '1' },
@@ -91,6 +75,7 @@ const CreateHelpTicket = () => {
     category: false,
     priority: false,
     serviceType: false,
+    unitNumber: false,
   });
 
   const [dropdownStates, setDropdownStates] = useState({
@@ -104,6 +89,7 @@ const CreateHelpTicket = () => {
   // Custom Modal States
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   // Animation Values
   const [successAnimation] = useState(new Animated.Value(0));
@@ -125,6 +111,135 @@ const CreateHelpTicket = () => {
       }).toString();
 
       console.log('🔗 Fetching dropdown data for group:', groupId);
+
+      const response = await fetch(API_CONFIG.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      const responseText = await response.text();
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${responseText}`);
+      }
+
+      const result = JSON.parse(responseText);
+      
+      let data: DropdownOption[] = [];
+      
+      if (result?.Data && Array.isArray(result.Data)) {
+        data = result.Data;
+      } else if (result && Array.isArray(result)) {
+        data = result;
+      } else if (result?.Result && Array.isArray(result.Result)) {
+        data = result.Result;
+      }
+
+      const validData = data.filter(item => 
+        item && 
+        typeof item === 'object' && 
+        ('Text' in item || 'Reference_List_Name' in item) && 
+        ('Value' in item || 'Reference_List_Id' in item)
+      );
+
+      const transformedData = validData.map(item => ({
+        Text: item.Text || item.Reference_List_Name || item.text || item.name || 'Unknown',
+        Value: item.Value || item.Reference_List_Id || item.value || item.id || '0'
+      }));
+
+      console.log(`✅ Successfully fetched ${transformedData.length} options for group ${groupId}`);
+      return transformedData;
+      
+    } catch (error: any) {
+      console.error(`❌ Dropdown API Error for group ${groupId}:`, error);
+      showCustomError('API Error', `Failed to fetch dropdown options: ${error.message || error}`);
+      return [];
+    }
+  };
+
+  // Fetch units for society ID 7
+  const fetchUnits = async (): Promise<DropdownOption[]> => {
+    try {
+      // Replace this with the actual stored procedure and parameters for fetching units
+      const valuesString = `@p_Society_Id=7,@p_Unit_Id=NULL,@p_Unit_Name=NULL`;
+      
+      const requestBody = new URLSearchParams({
+        AuthKey: API_CONFIG.authKey,
+        HostKey: API_CONFIG.hostKey,
+        Object: "Your_Unit_Fetch_StoredProcedure", // Replace with actual SP name
+        Values: valuesString,
+      }).toString();
+
+      console.log('🔗 Fetching units for society ID 7');
+
+      const response = await fetch(API_CONFIG.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Accept': 'application/json',
+        },
+        body: requestBody,
+      });
+
+      const responseText = await response.text();
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${responseText}`);
+      }
+
+      const result = JSON.parse(responseText);
+      
+      let data: any[] = [];
+      
+      if (result?.Data && Array.isArray(result.Data)) {
+        data = result.Data;
+      } else if (result && Array.isArray(result)) {
+        data = result;
+      }
+
+      const transformedData = data.map(item => ({
+        Text: item.Unit_Name || item.unit_name || `Unit ${item.Unit_Id || item.unit_id}`,
+        Value: String(item.Unit_Id || item.unit_id || '0')
+      }));
+
+      console.log(`✅ Successfully fetched ${transformedData.length} units`);
+      return transformedData;
+      
+    } catch (error: any) {
+      console.error('❌ Units API Error:', error);
+      // Fallback to static data if API fails
+      return [
+        { Text: 'Unit E305', Value: '280' },
+        { Text: 'Unit 102', Value: '102' },
+        { Text: 'Unit 103', Value: '103' },
+        { Text: 'Unit 104', Value: '104' },
+      ];
+    }
+  };
+
+  // Submit help ticket to database
+  const submitHelpTicket = async (): Promise<boolean> => {
+    try {
+      setIsSubmitting(true);
+      
+      // Get current date in YYYY-MM-DD format
+      const currentDate = new Date().toISOString().split('T')[0];
+      
+      // Prepare the parameters for HEM_SP_HelpDesk_Add
+      const valuesString = `@p_Society_Id=7,@p_Unit_Id=${formData.unitNumberId || 280},@p_Help_Category_Id=${formData.categoryId},@p_Help_Priority_Id=${formData.priorityId},@p_Requested_By=${formData.requestById},@p_Request_Date='${currentDate}',@p_Service_Type=${formData.serviceTypeId},@p_Assign_To=NULL,@p_Resolve_Date=NULL,@p_Help_Title='Help Request',@p_Description='${formData.description.replace(/'/g, "''")}',@p_Help_Status_Id=1,@p_Attribute1=NULL,@p_Attribute2=NULL,@p_Attribute3=NULL,@p_Attribute4=NULL,@p_Attribute5=NULL,@p_Attribute6=NULL,@p_Attribute7=NULL,@p_Attribute8=NULL,@p_Attribute9=NULL,@p_Attribute10=NULL,@p_Token_No=NULL,@p_Created_By=1`;
+      
+      const requestBody = new URLSearchParams({
+        AuthKey: API_CONFIG.authKey,
+        HostKey: API_CONFIG.hostKey,
+        Object: "HEM_SP_HelpDesk_Add",
+        Values: valuesString,
+      }).toString();
+
+      console.log('🚀 Submitting help ticket...');
       console.log('📤 Request body:', requestBody);
 
       const response = await fetch(API_CONFIG.url, {
@@ -137,25 +252,28 @@ const CreateHelpTicket = () => {
       });
 
       const responseText = await response.text();
-      console.log('📥 API Response:', responseText);
-
+      console.log('📥 Submit response:', responseText);
+      
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${responseText}`);
       }
 
       const result = JSON.parse(responseText);
       
-      if (result?.Data && Array.isArray(result.Data)) {
-        console.log('✅ Successfully fetched', result.Data.length, 'options for group', groupId);
-        return result.Data;
+      // Check if the response indicates success
+      if (result?.success !== false && !result?.error) {
+        console.log('✅ Help ticket submitted successfully');
+        return true;
+      } else {
+        throw new Error(result?.error || result?.message || 'Failed to submit ticket');
       }
       
-      console.log('⚠️ No data found for group', groupId);
-      return [];
     } catch (error: any) {
-      console.error('❌ Dropdown API Error for group', groupId, ':', error);
-      showCustomError('API Error', `Failed to fetch dropdown options: ${error.message || error}`);
-      return [];
+      console.error('❌ Submit ticket error:', error);
+      showCustomError('Submission Error', `Failed to submit help ticket: ${error.message || error}`);
+      return false;
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -165,33 +283,40 @@ const CreateHelpTicket = () => {
       console.log('🚀 Loading dropdown data from API...');
       
       try {
-        // Set loading states
         setLoadingStates({
           category: true,
           priority: true,
           serviceType: true,
+          unitNumber: true,
         });
 
-        // Fetch all dropdown data in parallel
-        const [categoryData, priorityData, serviceTypeData] = await Promise.all([
+        const [categoryData, priorityData, serviceTypeData, unitData] = await Promise.all([
           fetchDropdownOptions('13'), // Category
           fetchDropdownOptions('14'), // Priority  
           fetchDropdownOptions('15'), // Service Type
+          fetchUnits(), // Units for society ID 7
         ]);
 
-        // Set the dropdown options
         setCategoryOptions(categoryData);
         setPriorityOptions(priorityData);
         setServiceTypeOptions(serviceTypeData);
+        setUnitNumberOptions(unitData);
+
+        console.log('📊 Final dropdown data loaded:');
+        console.log('- Category options:', categoryData.length);
+        console.log('- Priority options:', priorityData.length);
+        console.log('- Service Type options:', serviceTypeData.length);
+        console.log('- Unit options:', unitData.length);
 
       } catch (error) {
         console.error('❌ Error loading dropdown data:', error);
+        showCustomError('Loading Error', 'Failed to load dropdown data. Please try again.');
       } finally {
-        // Clear loading states
         setLoadingStates({
           category: false,
           priority: false,
           serviceType: false,
+          unitNumber: false,
         });
       }
     };
@@ -212,12 +337,11 @@ const CreateHelpTicket = () => {
       Animated.timing(successAnimation, {
         toValue: 0,
         duration: 500,
-        delay: 3000, // Display for 3 seconds
+        delay: 3000,
         useNativeDriver: true,
       }),
     ]).start(() => {
       setShowSuccessModal(false);
-      // Reset form after successful submission
       resetForm();
     });
   };
@@ -349,40 +473,6 @@ const CreateHelpTicket = () => {
     console.log(`📝 Selected ${field}:`, text, 'with ID:', value);
   };
 
-  const takePhoto = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      showCustomError('Permission needed', 'Camera permission is required to take photos');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      setAttachments(prev => [...prev, { ...result.assets[0], name: result.assets[0].uri.split('/').pop() }]);
-    }
-  };
-
-  const uploadDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['image/*', 'application/pdf'],
-        copyToCacheDirectory: true,
-      });
-
-      if (!result.canceled) {
-        setAttachments(prev => [...prev, result.assets[0]]);
-      }
-    } catch {
-      showCustomError('Error', 'Failed to pick document');
-    }
-  };
-
   const resetForm = () => {
     setFormData({
       unitNumber: '',
@@ -397,19 +487,21 @@ const CreateHelpTicket = () => {
       serviceTypeId: '',
       description: '',
     });
-    setAttachments([]);
   };
 
-  const submitTicket = () => {
+  const submitTicket = async () => {
     const requiredFields = [
       { field: 'unitNumber', label: 'Unit Number' },
       { field: 'category', label: 'Category' },
       { field: 'priority', label: 'Priority' },
       { field: 'requestBy', label: 'Request By' },
       { field: 'serviceType', label: 'Service Type' },
+      { field: 'description', label: 'Description' },
     ];
     
-    const missing = requiredFields.filter(({ field }) => !formData[field as keyof FormData]);
+    const missing = requiredFields.filter(({ field }) => 
+      field === 'description' ? !formData.description.trim() : !formData[field as keyof FormData]
+    );
     
     if (missing.length > 0) {
       const missingFields = missing.map(({ label }) => label).join(', ');
@@ -417,18 +509,12 @@ const CreateHelpTicket = () => {
       return;
     }
 
-    // Log the form data with IDs for database storage
-    console.log('💾 Ticket data to be saved:');
-    console.log('Unit Number:', formData.unitNumber, '(ID:', formData.unitNumberId, ')');
-    console.log('Category:', formData.category, '(ID:', formData.categoryId, ')');
-    console.log('Priority:', formData.priority, '(ID:', formData.priorityId, ')');
-    console.log('Request By:', formData.requestBy, '(ID:', formData.requestById, ')');
-    console.log('Service Type:', formData.serviceType, '(ID:', formData.serviceTypeId, ')');
-    console.log('Description:', formData.description);
-    console.log('Attachments:', attachments.length);
-
-    // Show success modal instead of alert
-    showCustomSuccess('Success!', 'Help ticket has been submitted successfully!');
+    // Submit the ticket to database
+    const success = await submitHelpTicket();
+    
+    if (success) {
+      showCustomSuccess('Success!', 'Help ticket has been submitted successfully!');
+    }
   };
 
   // Render dropdown field with radio buttons
@@ -444,7 +530,7 @@ const CreateHelpTicket = () => {
       </Text>
 
       <TouchableOpacity 
-        style={styles.dropdown} 
+        style={[styles.dropdown, loading && styles.dropdownDisabled]} 
         onPress={() => !loading && options.length > 0 && toggleDropdown(field)}
         disabled={loading || options.length === 0}
       >
@@ -479,20 +565,26 @@ const CreateHelpTicket = () => {
               </View>
               
               <ScrollView style={styles.optionsList} showsVerticalScrollIndicator={false}>
-                {options.map((option, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.radioOption}
-                    onPress={() => selectOption(field, option.Text, option.Value)}
-                  >
-                    <View style={styles.radioButton}>
-                      {formData[field as keyof FormData] === option.Text && (
-                        <View style={styles.radioButtonSelected} />
-                      )}
-                    </View>
-                    <Text style={styles.radioText}>{option.Text}</Text>
-                  </TouchableOpacity>
-                ))}
+                {options.length > 0 ? (
+                  options.map((option, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={styles.radioOption}
+                      onPress={() => selectOption(field, option.Text, option.Value)}
+                    >
+                      <View style={styles.radioButton}>
+                        {formData[field as keyof FormData] === option.Text && (
+                          <View style={styles.radioButtonSelected} />
+                        )}
+                      </View>
+                      <Text style={styles.radioText}>{option.Text}</Text>
+                    </TouchableOpacity>
+                  ))
+                ) : (
+                  <View style={styles.noOptionsContainer}>
+                    <Text style={styles.noOptionsText}>No options available</Text>
+                  </View>
+                )}
               </ScrollView>
 
               <TouchableOpacity 
@@ -510,7 +602,6 @@ const CreateHelpTicket = () => {
 
   return (
     <View style={styles.container}>
-      {/* Custom Modals */}
       <SuccessModal />
       <ErrorModal />
       
@@ -522,60 +613,19 @@ const CreateHelpTicket = () => {
       </View>
 
       <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
-        
         <View style={styles.content}>
-          <View style={styles.card}>
-            <Text style={styles.attachmentTitle}>
-              Upload Images <Text style={styles.required}>*</Text>
-            </Text>
-
-            <View style={styles.attachmentContainer}>
-              <TouchableOpacity style={styles.attachmentOption} onPress={takePhoto}>
-                <Ionicons name="camera" size={30} color="#03C174" />
-                <Text style={styles.attachmentText}>Take a photo</Text>
-              </TouchableOpacity>
-
-              <Text style={styles.orText}>or</Text>
-
-              <TouchableOpacity style={styles.attachmentOption} onPress={uploadDocument}>
-                <Ionicons name="cloud-upload" size={30} color="#03C174" />
-                <Text style={styles.attachmentText}>upload documents</Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.supportedText}>
-              Supported: JPG, PNG, PDF (Max 5MB each)
-            </Text>
-
-            {attachments.length > 0 && (
-              <View style={styles.attachmentsList}>
-                {attachments.map((attachment, index) => (
-                  <View key={index} style={styles.attachmentItem}>
-                    <Text style={styles.attachmentName}>
-                      {'name' in attachment
-                        ? attachment.name
-                        : attachment.uri.split('/').pop() || `Attachment ${index + 1}`}
-                    </Text>
-                    <TouchableOpacity
-                      onPress={() => setAttachments(prev => prev.filter((_, i) => i !== index))}
-                    >
-                      <Ionicons name="close-circle" size={20} color="#ff4444" />
-                    </TouchableOpacity>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
           <View style={styles.card}>
             <Text style={styles.cardTitle}>Ticket Details</Text>
 
-            {renderDropdownField('unitNumber', 'Unit Number', unitNumberOptions)}
+            {renderDropdownField('unitNumber', 'Unit Number', unitNumberOptions, loadingStates.unitNumber)}
             {renderDropdownField('category', 'Category', categoryOptions, loadingStates.category)}
             {renderDropdownField('priority', 'Priority', priorityOptions, loadingStates.priority)}
             {renderDropdownField('requestBy', 'Request By', requestByOptions)}
             {renderDropdownField('serviceType', 'Service Type', serviceTypeOptions, loadingStates.serviceType)}
 
-            <Text style={styles.label}>Description</Text>
+            <Text style={styles.label}>
+              Description <Text style={styles.required}>*</Text>
+            </Text>
             <TextInput
               style={styles.textArea}
               multiline
@@ -588,21 +638,31 @@ const CreateHelpTicket = () => {
             />
           </View>
 
-          
-
           <View style={styles.buttonContainer}>
-            <TouchableOpacity style={styles.resetButton} onPress={resetForm}>
+            <TouchableOpacity 
+              style={[styles.resetButton, isSubmitting && styles.buttonDisabled]} 
+              onPress={resetForm}
+              disabled={isSubmitting}
+            >
               <Text style={styles.resetButtonText}>Reset</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={submitTicket}>
+            <TouchableOpacity 
+              onPress={submitTicket}
+              disabled={isSubmitting}
+              style={isSubmitting && styles.buttonDisabled}
+            >
               <LinearGradient
                 colors={['#146070', '#03C174']}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={styles.submitButton}
               >
-                <Text style={styles.submitButtonText}>Submit Ticket</Text>
+                {isSubmitting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <Text style={styles.submitButtonText}>Submit Ticket</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
           </View>
@@ -612,9 +672,8 @@ const CreateHelpTicket = () => {
   );
 };
 
-// Modal Styles
+// Modal Styles (same as before)
 const modalStyles = StyleSheet.create({
-  // Success Modal Styles
   successOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -648,8 +707,6 @@ const modalStyles = StyleSheet.create({
     textAlign: 'center',
     opacity: 0.9,
   },
-
-  // Error Modal Styles
   errorOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -772,6 +829,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     minHeight: 52,
   },
+  dropdownDisabled: {
+    backgroundColor: '#f8f8f8',
+    opacity: 0.7,
+  },
   dropdownText: {
     fontSize: 16,
     color: '#333',
@@ -779,8 +840,6 @@ const styles = StyleSheet.create({
   placeholder: {
     color: '#999',
   },
-  
-  // Modal styles for radio button dropdowns
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -853,7 +912,15 @@ const styles = StyleSheet.create({
     color: '#666',
     fontWeight: '500',
   },
-
+  noOptionsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  noOptionsText: {
+    fontSize: 16,
+    color: '#999',
+    textAlign: 'center',
+  },
   textArea: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -862,58 +929,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     minHeight: 80,
     color: '#333',
-  },
-  attachmentTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 20,
-  },
-  attachmentContainer: {
-    borderWidth: 2,
-    borderColor: '#03C174',
-    borderStyle: 'dashed',
-    borderRadius: 12,
-    padding: 20,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  attachmentOption: {
-    alignItems: 'center',
-    marginVertical: 5,
-  },
-  attachmentText: {
-    fontSize: 14,
-    color: '#03C174',
-    marginTop: 4,
-    fontWeight: '500',
-  },
-  orText: {
-    fontSize: 16,
-    color: '#666',
-    marginVertical: 10,
-  },
-  supportedText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-  },
-  attachmentsList: {
-    marginTop: 16,
-  },
-  attachmentItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 12,
-    backgroundColor: '#f8f8f8',
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  attachmentName: {
-    fontSize: 14,
-    color: '#333',
-    flex: 1,
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -944,6 +959,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
 });
 

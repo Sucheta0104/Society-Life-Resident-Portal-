@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect} from 'react';
 import {
   View,
   Text,
@@ -23,9 +23,11 @@ import * as DocumentPicker from 'expo-document-picker';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import type { ReactNode } from 'react';
+// import type { ReactNode } from 'react';
+
 
 const { width: screenWidth } = Dimensions.get('window');
+
 
 type FormData = {
   title: string;
@@ -56,16 +58,20 @@ type FormData = {
   emergencyRelation: string;
 };
 
+
 type CountryCode = {
   code: string;
   flag: string;
   name: string;
 };
 
+
 type DropdownOption = {
   label: string;
   value: string;
 };
+
+type ReactNode = any;
 
 const countryCodes: CountryCode[] = [
   { code: '+91', flag: '🇮🇳', name: 'India' },
@@ -76,53 +82,6 @@ const countryCodes: CountryCode[] = [
   { code: '+49', flag: '🇩🇪', name: 'Germany' },
   { code: '+33', flag: '🇫🇷', name: 'France' },
 ];
-
-// Dropdown options
-const titles: DropdownOption[] = [
-  { label: 'Mr.', value: 'mr' },
-  { label: 'Mrs.', value: 'mrs' },
-  { label: 'Ms.', value: 'ms' },
-  { label: 'Dr.', value: 'dr' },
-  { label: 'Prof.', value: 'prof' },
-];
-
-const genders: DropdownOption[] = [
-  { label: 'Male', value: 'male' },
-  { label: 'Female', value: 'female' },
-  { label: 'Other', value: 'other' },
-];
-
-const religions: DropdownOption[] = [
-  { label: 'Hindu', value: 'hindu' },
-  { label: 'Muslim', value: 'muslim' },
-  { label: 'Christian', value: 'christian' },
-  { label: 'Sikh', value: 'sikh' },
-  { label: 'Buddhist', value: 'buddhist' },
-  { label: 'Jain', value: 'jain' },
-  { label: 'Other', value: 'other' },
-];
-
-const states: DropdownOption[] = [
-  { label: 'Odisha', value: 'odisha' },
-  { label: 'Delhi', value: 'delhi' },
-  { label: 'Maharashtra', value: 'maharashtra' },
-  { label: 'Karnataka', value: 'karnataka' },
-  { label: 'Tamil Nadu', value: 'tamilnadu' },
-  { label: 'Gujarat', value: 'gujarat' },
-  { label: 'Rajasthan', value: 'rajasthan' },
-  { label: 'Punjab', value: 'punjab' },
-  { label: 'West Bengal', value: 'westbengal' },
-  { label: 'Uttar Pradesh', value: 'uttarpradesh' },
-];
-
-const countries: DropdownOption[] = [
-  { label: 'India', value: 'india' },
-  { label: 'United States', value: 'usa' },
-  { label: 'United Kingdom', value: 'uk' },
-  { label: 'Canada', value: 'canada' },
-  { label: 'Australia', value: 'australia' },
-];
-
 const AddTenantScreen = () => {
   const navigation = useNavigation();
   const [formData, setFormData] = useState<FormData>({
@@ -161,6 +120,7 @@ const AddTenantScreen = () => {
     emergencyRelation: '',
   });
 
+
   const [profileImage, setProfileImage] = useState<string | null>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [errors, setErrors] = useState<{ [key: string]: boolean }>({});
@@ -185,6 +145,134 @@ const AddTenantScreen = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successAnimation] = useState(new Animated.Value(0));
 
+  // API dropdown options
+  const [titles, setTitles] = useState<DropdownOption[]>([]);
+  const [genders, setGenders] = useState<DropdownOption[]>([]);
+  const [religions, setReligions] = useState<DropdownOption[]>([]);
+  const [countriesData, setCountriesData] = useState<DropdownOption[]>([]);
+  const [statesData, setStatesData] = useState<DropdownOption[]>([]);
+  const [isLoadingDropdowns, setIsLoadingDropdowns] = useState(true);
+
+  // API configuration
+  const API_BASE_URL = 'https://applianceservicemgmt.dev2stage.in/api/rest/Invoke';
+  const AUTH_KEY = '86A264E4-ECF8-4627-AF83-5512FE83DAE6';
+  const HOST_KEY = '8ECB211D2';
+
+  // Fetch dropdown data from API
+ const fetchDropdownData = async (
+  groupId: string,
+  type: 'reference' | 'country' | 'state' = 'reference',
+  parentId: string = '' // add parentId for cascading
+): Promise<DropdownOption[]> => {
+  try {
+    let valuesString = '';
+
+    if (type === 'reference') {
+      valuesString = `0,'RD_TBL_Reference_List','Reference_List_Group_Id',${groupId},'Reference_List_Name','Reference_List_Id'`;
+    } else if (type === 'country') {
+      valuesString = `0,'RD_TBL_Country','','','Country_Name','Country_Id'`;
+    } else if (type === 'state') {
+      // pass selected Country Id as parentId
+      valuesString = `0,'RD_TBL_State','Country_Id','${parentId}','State_Name','State_Id'`;
+    }
+
+    const formBody = new URLSearchParams({
+      AuthKey: AUTH_KEY,
+      HostKey: HOST_KEY,
+      Object: 'CMN_SP_Generic_DropdownList_Get',
+      Values: valuesString,
+    }).toString();
+
+    console.log(`API Request [${type}] (group ${groupId}):`, valuesString);
+
+    const response = await fetch(API_BASE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: formBody,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`API Response [${type}] (group ${groupId}):`, JSON.stringify(data, null, 2));
+
+    if (data?.Data?.length) {
+      return data.Data.map((item: any) => ({
+        label: item.Country_Name || item.State_Name || item.Text || '',
+        value: item.Country_Id?.toString() || item.State_Id?.toString() || item.Value?.toString() || '',
+      }));
+    }
+
+    return [];
+  } catch (error) {
+    console.error(`Error fetching dropdown data [${type}] (group ${groupId}):`, error);
+    return [];
+  }
+};
+
+
+
+  // Load all dropdown data on component mount
+ useEffect(() => {
+  const loadDropdownData = async () => {
+    setIsLoadingDropdowns(true);
+
+    try {
+      const [titlesData, gendersData, religionsData, countries] = await Promise.all([
+  fetchDropdownData('3', 'reference'),
+  fetchDropdownData('4', 'reference'),
+  fetchDropdownData('5', 'reference'),
+  fetchDropdownData('0', 'country'),
+]);
+
+
+      setTitles(titlesData);
+setGenders(gendersData);
+setReligions(religionsData);
+setCountriesData(countries);
+setStatesData([]);
+    } catch (error) {
+      console.error('Error loading dropdown data:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load some options. Please check your internet connection and try again.',
+        [
+          {
+            text: 'Retry',
+            onPress: loadDropdownData,
+          },
+          {
+            text: 'Continue',
+            style: 'cancel',
+          },
+        ]
+      );
+    } finally {
+      setIsLoadingDropdowns(false);
+    }
+  };
+
+  loadDropdownData();
+}, []);
+
+const handleCountrySelect = async (countryId: string) => {
+  // Save selected country
+  handleInputChange('country', countryId);
+
+  // Clear previously selected state
+  handleInputChange('state', '');
+
+  // Fetch states for selected country
+  setIsLoadingDropdowns(true);
+  const statesForCountry = await fetchDropdownData('0', 'state', countryId);
+  setStatesData(statesForCountry);
+  setIsLoadingDropdowns(false);
+};
+
+
+
   const handleInputChange = <K extends keyof FormData>(field: K, value: string) => {
     setFormData(prev => ({
       ...prev,
@@ -199,6 +287,7 @@ const AddTenantScreen = () => {
       }));
     }
   };
+
 
   const validateForm = () => {
     const requiredFields: (keyof FormData)[] = ["name", "email", "phone"];
@@ -220,15 +309,18 @@ const AddTenantScreen = () => {
       newErrors.phone = true;
     }
 
+
     // Aadhar validation
     if (formData.aadharNumber && !/^\d{4}\s\d{4}\s\d{4}$/.test(formData.aadharNumber)) {
       newErrors.aadharNumber = true;
     }
 
+
     // PAN validation
     if (formData.panNumber && !/^[A-Z]{5}[0-9]{4}[A-Z]{1}$/.test(formData.panNumber)) {
       newErrors.panNumber = true;
     }
+
 
     // Pincode validation
     if (formData.pincode && !/^\d{6}$/.test(formData.pincode)) {
@@ -238,6 +330,7 @@ const AddTenantScreen = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
 
   // Image picker functions
   const takePicture = async () => {
@@ -251,6 +344,7 @@ const AddTenantScreen = () => {
       }
     }
 
+
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -258,10 +352,12 @@ const AddTenantScreen = () => {
       quality: 0.8,
     });
 
+
     if (!result.canceled) {
       setProfileImage(result.assets[0].uri);
     }
   };
+
 
   const pickFromGallery = async () => {
     setShowImagePickerModal(false);
@@ -272,6 +368,7 @@ const AddTenantScreen = () => {
       return;
     }
 
+
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
       allowsEditing: true,
@@ -279,19 +376,23 @@ const AddTenantScreen = () => {
       quality: 0.8,
     });
 
+
     if (!result.canceled) {
       setProfileImage(result.assets[0].uri);
     }
   };
 
+
   const pickDocument = async () => {
     setShowImagePickerModal(false);
+
 
     try {
       const result: any = await DocumentPicker.getDocumentAsync({
         type: ['image/*'],
         copyToCacheDirectory: true,
       });
+
 
       if (result.type === 'success') {
         if (result.size && result.size > 5000000) {
@@ -305,9 +406,11 @@ const AddTenantScreen = () => {
     }
   };
 
+
   const showImagePickerOptions = () => {
     setShowImagePickerModal(true);
   };
+
 
   const handleDateChange = (event: any, selectedDate?: Date, field?: string) => {
     setShowDatePicker(null);
@@ -316,6 +419,7 @@ const AddTenantScreen = () => {
       handleInputChange(field as keyof FormData, formattedDate);
     }
   };
+
 
   const showSuccessAlert = () => {
     setShowSuccessModal(true);
@@ -338,13 +442,16 @@ const AddTenantScreen = () => {
     });
   };
 
+
   const handleSubmit = () => {
     if (!validateForm()) {
       return;
     }
 
+
     showSuccessAlert();
   };
+
 
   const renderPhoneInput = (
     placeholder: string,
@@ -409,58 +516,68 @@ const AddTenantScreen = () => {
     </View>
   );
 
+
   const renderDropdown = (
-    placeholder: string,
-    field: keyof FormData,
-    options: DropdownOption[],
-    showDropdown: boolean,
-    setShowDropdown: (show: boolean) => void
-  ) => (
-    <View>
-      <TouchableOpacity
-        style={[styles.dropdownContainer, errors[field] && styles.inputError]}
-        onPress={() => setShowDropdown(true)}
-      >
-        <Text style={[styles.dropdownText, !formData[field] && styles.placeholderText]}>
-          {formData[field] ? options.find(opt => opt.value === formData[field])?.label || formData[field] : placeholder}
-        </Text>
-        <Ionicons name="chevron-down" size={20} color="#666" />
-      </TouchableOpacity>
-      
-      <Modal
-        visible={showDropdown}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowDropdown(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Select {placeholder}</Text>
-              <TouchableOpacity onPress={() => setShowDropdown(false)}>
-                <Ionicons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={options}
-              keyExtractor={(item) => item.value}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => {
-                    handleInputChange(field, item.value);
-                    setShowDropdown(false);
-                  }}
-                >
-                  <Text style={styles.dropdownItemText}>{item.label}</Text>
-                </TouchableOpacity>
-              )}
-            />
+  placeholder: string,
+  field: keyof FormData,
+  options: DropdownOption[],
+  showDropdown: boolean,
+  setShowDropdown: (show: boolean) => void,
+  onSelect?: (value: string) => void // add optional callback
+) => (
+  <View>
+    <TouchableOpacity
+      style={[styles.dropdownContainer, errors[field] && styles.inputError]}
+      onPress={() => {
+        if (isLoadingDropdowns) {
+          Alert.alert('Loading', 'Please wait while options are being loaded...');
+          return;
+        }
+        setShowDropdown(true);
+      }}
+    >
+      <Text style={[styles.dropdownText, !formData[field] && styles.placeholderText]}>
+        {formData[field] ? options.find(opt => opt.value === formData[field])?.label || formData[field] : placeholder}
+      </Text>
+      <Ionicons name="chevron-down" size={20} color="#666" />
+    </TouchableOpacity>
+
+    <Modal
+      visible={showDropdown}
+      transparent
+      animationType="slide"
+      onRequestClose={() => setShowDropdown(false)}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>{placeholder}</Text>
+            <TouchableOpacity onPress={() => setShowDropdown(false)}>
+              <Ionicons name="close" size={24} color="#666" />
+            </TouchableOpacity>
           </View>
+          <FlatList
+            data={options}
+            keyExtractor={(item) => item.value}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={styles.dropdownItem}
+                onPress={() => {
+                  handleInputChange(field, item.value);
+                  setShowDropdown(false);
+                  if (onSelect) onSelect(item.value); // trigger cascade
+                }}
+              >
+                <Text style={styles.dropdownItemText}>{item.label}</Text>
+              </TouchableOpacity>
+            )}
+          />
         </View>
-      </Modal>
-    </View>
-  );
+      </View>
+    </Modal>
+  </View>
+);
+
 
   const renderDateInput = (placeholder: string, field: keyof FormData) => (
     <View>
@@ -484,6 +601,7 @@ const AddTenantScreen = () => {
       )}
     </View>
   );
+
 
   const renderInputField = (
     placeholder: string,
@@ -545,12 +663,14 @@ const AddTenantScreen = () => {
     </View>
   );
 
+
   const renderSectionCard = (title: string, children: ReactNode) => (
     <View style={styles.sectionCard}>
       <Text style={styles.sectionTitle}>{title}</Text>
       {children}
     </View>
   );
+
 
   // Image Picker Modal Component
   const ImagePickerModal = () => (
@@ -598,6 +718,7 @@ const AddTenantScreen = () => {
     </Modal>
   );
 
+
   const SuccessModal = () => (
     <Modal
       visible={showSuccessModal}
@@ -640,6 +761,7 @@ const AddTenantScreen = () => {
     </Modal>
   );
 
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#f5f5f5" />
@@ -654,6 +776,7 @@ const AddTenantScreen = () => {
           <View style={styles.placeholder} />
         </View>
       </View>
+
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Profile Picture Section - Updated Design */}
@@ -685,6 +808,7 @@ const AddTenantScreen = () => {
           </View>
         )}
 
+
         {/* Personal Information */}
         {renderSectionCard(
           'Personal Information',
@@ -700,6 +824,7 @@ const AddTenantScreen = () => {
               <Text style={styles.inputLabel}>Gender <Text style={styles.requiredAsterisk}>*</Text></Text>
               {renderDropdown('Select Gender', 'gender', genders, showGenderDropdown, setShowGenderDropdown)}
             </View>
+
 
             {renderInputField('Email Address', 'email', 'email-address', false, true)}
             
@@ -720,6 +845,7 @@ const AddTenantScreen = () => {
               )}
             </View>
 
+
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Alternative Contact Number</Text>
               {renderPhoneInput(
@@ -732,10 +858,12 @@ const AddTenantScreen = () => {
               )}
             </View>
 
+
             <View style={styles.inputContainer}>
               <Text style={styles.inputLabel}>Date of Birth</Text>
               {renderDateInput('Select Date of Birth', 'dateOfBirth')}
             </View>
+
 
             {renderInputField('Aadhar Number', 'aadharNumber', 'numeric', false, false, 14)}
             {renderInputField('PAN Number', 'panNumber', 'default', false, false, 10)}
@@ -747,6 +875,7 @@ const AddTenantScreen = () => {
           </>
         )}
 
+
         {/* Current Address */}
         {renderSectionCard(
           'Current Address',
@@ -754,17 +883,26 @@ const AddTenantScreen = () => {
             {renderInputField('Street Address', 'currentAddress', 'default', true)}
             {renderInputField('City', 'city')}
             <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>State</Text>
-              {renderDropdown('Select State', 'state', states, showStateDropdown, setShowStateDropdown)}
-            </View>
+  <Text style={styles.inputLabel}>Country</Text>
+  {renderDropdown(
+    'Select Country',
+    'country',
+    countriesData,
+    showCountryDropdown,
+    setShowCountryDropdown,
+    handleCountrySelect 
+  )}
+</View>
+           <View style={styles.inputContainer}>
+  <Text style={styles.inputLabel}>State</Text>
+  {renderDropdown('Select State', 'state', statesData, showStateDropdown, setShowStateDropdown)}
+</View>
             {renderInputField('ZIP Code', 'zipCode', 'numeric', false, false, 6)}
             {renderInputField('Pincode', 'pincode', 'numeric', false, false, 6)}
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Country</Text>
-              {renderDropdown('Select Country', 'country', countries, showCountryDropdown, setShowCountryDropdown)}
-            </View>
+            
           </>
         )}
+
 
         {/* Lease Information */}
         {renderSectionCard(
@@ -788,6 +926,7 @@ const AddTenantScreen = () => {
           </>
         )}
 
+
         {/* Emergency Contact */}
         {renderSectionCard(
           'Emergency Contact',
@@ -808,6 +947,7 @@ const AddTenantScreen = () => {
           </>
         )}
 
+
         {/* Submit Buttons */}
         <View style={styles.buttonContainer}>
           <TouchableOpacity style={styles.cancelButton} onPress={() => navigation.goBack()}>
@@ -825,14 +965,17 @@ const AddTenantScreen = () => {
           </TouchableOpacity>
         </View>
 
+
         <View style={styles.bottomPadding} />
       </ScrollView>
+
 
       <ImagePickerModal />
       <SuccessModal />
     </SafeAreaView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -889,6 +1032,7 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
 
+
   // Photo Upload Styles
   photoContainer: {
     alignItems: 'center',
@@ -938,6 +1082,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
 
+
   // Form Input Styles
   inputContainer: {
     marginBottom: 15,
@@ -979,6 +1124,7 @@ const styles = StyleSheet.create({
     paddingTop: 12,
   },
 
+
   // Phone Input Styles
   phoneContainer: {
     flexDirection: 'row',
@@ -1009,6 +1155,7 @@ const styles = StyleSheet.create({
     height: 48,
   },
 
+
   // Dropdown Styles
   dropdownContainer: {
     backgroundColor: '#f8f9fa',
@@ -1034,6 +1181,7 @@ const styles = StyleSheet.create({
   placeholderText: {
     color: '#999',
   },
+
 
   // Modal Styles
   modalOverlay: {
@@ -1061,6 +1209,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
 
+
   // Country Code Modal Styles
   countryCodeItem: {
     flexDirection: 'row',
@@ -1084,6 +1233,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
 
+
   // Dropdown Item Styles
   dropdownItem: {
     paddingHorizontal: 20,
@@ -1095,6 +1245,18 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
+
+  // No Options Container
+  noOptionsContainer: {
+    padding: 40,
+    alignItems: 'center',
+  },
+  noOptionsText: {
+    fontSize: 16,
+    color: '#666',
+    fontStyle: 'italic',
+  },
+
 
   // Image Picker Modal Styles
   imagePickerModalOverlay: {
@@ -1163,6 +1325,7 @@ const styles = StyleSheet.create({
     color: '#d32f2f',
   },
 
+
   // Button Styles
   buttonContainer: {
     flexDirection: 'row',
@@ -1200,6 +1363,7 @@ const styles = StyleSheet.create({
     height: 30,
   },
 
+
   // Success Modal Styles
   successModalOverlay: {
     flex: 1,
@@ -1234,5 +1398,6 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
 });
+
 
 export default AddTenantScreen;

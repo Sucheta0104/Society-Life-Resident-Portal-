@@ -169,7 +169,7 @@ export default function VisitorManagement() {
   const navigation = useNavigation<NavigationProps>();
 
   // States
-  const [visitors, setVisitors] = useState<Visitor[]>([]);
+  const [visitors, setVisitors] = useState<Visitor[]>([]); 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchQuery, setSearchQuery] = useState("");

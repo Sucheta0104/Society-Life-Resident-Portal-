@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  FlatList,
   Dimensions,
   ActivityIndicator,
   TextInput,
@@ -20,15 +19,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from "@react-navigation/native";
 
-// Add API_CONFIG constant
 const API_CONFIG = {
   url: 'https://applianceservicemgmt.dev2stage.in/api/rest/Invoke',
   authKey: '86A264E4-ECF8-4627-AF83-5512FE83DAE6',
   hostKey: '8ECB211D2'
 };
 
-const { width, height } = Dimensions.get('window');
-const isTablet = width > 768;
+const { width } = Dimensions.get('window');
 
 type TicketStatus = 'completed' | 'inProgress' | 'pending';
 type Ticket = {
@@ -50,8 +47,6 @@ const HelpDesk = () => {
   const [error, setError] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [itemsPerPage] = useState(10);
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchFilters, setSearchFilters] = useState({
     ticketId: '',
@@ -59,7 +54,7 @@ const HelpDesk = () => {
     requester: '',
     status: 'all'
   });
-  
+
   const navigation = useNavigation();
   const [stats, setStats] = useState({
     total: 0,
@@ -68,22 +63,21 @@ const HelpDesk = () => {
     pending: 0
   });
 
-  // Handle back navigation
+  const [viewModalVisible, setViewModalVisible] = useState(false);
+  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
+
   const handleBackPress = () => {
     navigation.goBack();
   };
 
-  // Calculate stats from tickets
   const calculateStats = useCallback((ticketData: Ticket[]) => {
     const total = ticketData.length;
-    const completed = ticketData.filter(ticket => ticket.status === 'completed').length;
-    const inProgress = ticketData.filter(ticket => ticket.status === 'inProgress').length;
-    const pending = ticketData.filter(ticket => ticket.status === 'pending').length;
-    
+    const completed = ticketData.filter(t => t.status === 'completed').length;
+    const inProgress = ticketData.filter(t => t.status === 'inProgress').length;
+    const pending = ticketData.filter(t => t.status === 'pending').length;
     return { total, completed, inProgress, pending };
   }, []);
 
-  // API Response Transformer
   const transformApiResponse = (item: any): Ticket => {
     const mapStatus = (apiStatus: string): TicketStatus => {
       const status = (apiStatus || '').toLowerCase();
@@ -102,7 +96,6 @@ const HelpDesk = () => {
     const formatDate = (dateStr: string): string => {
       if (!dateStr) return new Date().toLocaleDateString();
       try {
-        // API date format: dd/MM/yyyy
         const [day, month, year] = dateStr.split('/');
         return new Date(+year, +month - 1, +day).toLocaleDateString();
       } catch {
@@ -123,18 +116,12 @@ const HelpDesk = () => {
     };
   };
 
-  // UPDATED: Fetch tickets function - removed mock data
   const fetchTickets = async (page: number = 1, showLoading: boolean = true) => {
     if (showLoading) setLoading(true);
     setError("");
-    
     try {
-      console.log('Fetching tickets from API...');
-
-      // Build parameter string
       const valuesString = `@p_Help_Desk_Id=NULL,@p_Society_Id=7,@p_Unit_Id=280,@p_Help_Category_Id=NULL,@p_Help_Priority_Id=NULL,@p_Requested_By=NULL,@p_From_Request_Date=NULL,@p_To_Request_Date=NULL,@p_Service_Type=NULL,@p_Assign_To=NULL,@p_From_Resolve_Date=NULL,@p_To_Resolve_Date=NULL,@p_Help_Title=NULL,@p_Description=NULL,@p_Help_Status_Id=NULL,@p_Attribute1=NULL,@p_Attribute2=NULL,@p_Attribute3=NULL,@p_Attribute4=NULL,@p_Attribute5=NULL,@p_Attribute6=NULL,@p_Attribute7=NULL,@p_Attribute8=NULL,@p_Attribute9=NULL,@p_Attribute10=NULL,@p_Help_Desk_GUId=NULL,@p_Token_No=NULL,@p_Is_Active=NULL,@p_Is_Archived=NULL,@p_Skip=0,@p_Take=50000,@p_Email=NULL,@p_First_Name=NULL,@p_Mobile_Number=NULL,@p_Assign_To_Email=NULL,@p_Assign_To_First_Name=NULL,@p_Assign_To_Mobile_Number=NULL`.replace(/\s+/g, '');
 
-      // Prepare URL-encoded body
       const requestBody = new URLSearchParams({
         AuthKey: API_CONFIG.authKey,
         HostKey: API_CONFIG.hostKey,
@@ -142,9 +129,6 @@ const HelpDesk = () => {
         Values: valuesString,
       }).toString();
 
-      console.log('API Request Body:', requestBody);
-
-      // Send POST request
       const response = await fetch(API_CONFIG.url, {
         method: "POST",
         headers: {
@@ -155,59 +139,31 @@ const HelpDesk = () => {
       });
 
       const responseText = await response.text();
-      console.log('Raw API Response:', responseText);
 
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${responseText}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}: ${responseText}`);
 
       const result = JSON.parse(responseText);
-      console.log('Parsed API Response:', result);
 
-      // Transform API response to Ticket[]
       let transformedData: Ticket[] = [];
-      if (result?.Data && Array.isArray(result.Data)) {
-        console.log('Found Data array with length:', result.Data.length);
-        transformedData = result.Data.map((item: any) => transformApiResponse(item));
-      } else if (Array.isArray(result)) {
-        console.log('Found direct array with length:', result.length);
-        transformedData = result.map((item: any) => transformApiResponse(item));
-      } else if (result?.data && Array.isArray(result.data)) {
-        console.log('Found data array with length:', result.data.length);
-        transformedData = result.data.map((item: any) => transformApiResponse(item));
-      } else if (result?.Result && Array.isArray(result.Result)) {
-        console.log('Found Result array with length:', result.Result.length);
-        transformedData = result.Result.map((item: any) => transformApiResponse(item));
-      } else if (typeof result === "object" && result !== null) {
-        console.log('Found single object, converting to array');
-        transformedData = [transformApiResponse(result)];
-      } else {
-        console.log('No recognizable data structure found');
-        transformedData = [];
-      }
-
-      console.log('Final transformed tickets:', transformedData);
+      if (result?.Data && Array.isArray(result.Data)) transformedData = result.Data.map(transformApiResponse);
+      else if (Array.isArray(result)) transformedData = result.map(transformApiResponse);
+      else if (result?.data && Array.isArray(result.data)) transformedData = result.data.map(transformApiResponse);
+      else if (result?.Result && Array.isArray(result.Result)) transformedData = result.Result.map(transformApiResponse);
+      else if (typeof result === "object" && result !== null) transformedData = [transformApiResponse(result)];
+      else transformedData = [];
 
       setTickets(transformedData);
       setFilteredTickets(transformedData);
       setStats(calculateStats(transformedData));
       setCurrentPage(page);
 
-      // Show message if no data found
-      if (transformedData.length === 0) {
-        setError('No help desk tickets found for this unit');
-      }
-
+      if (transformedData.length === 0) setError('No help desk tickets found for this unit');
     } catch (err: any) {
-      console.error('API Error:', err);
       const errorMessage = err.message || "Failed to fetch tickets";
       setError(errorMessage);
-      
-      // Clear data on error - NO MORE MOCK DATA
       setTickets([]);
       setFilteredTickets([]);
       setStats({ total: 0, completed: 0, inProgress: 0, pending: 0 });
-      
       Alert.alert("API Error", `Failed to fetch tickets: ${errorMessage}`);
     } finally {
       setLoading(false);
@@ -219,292 +175,93 @@ const HelpDesk = () => {
     fetchTickets(currentPage);
   }, [currentPage]);
 
-  // Pull to refresh
   const onRefresh = useCallback(() => {
     setRefreshing(true);
     fetchTickets(1, false);
   }, []);
 
-  // Search functionality
-  const handleSearch = () => {
-    setSearchVisible(true);
-  };
+  const handleSearch = () => setSearchVisible(true);
 
   const applySearch = () => {
     let filtered = [...tickets];
-    if (searchFilters.ticketId.trim()) {
-      filtered = filtered.filter(ticket => 
-        ticket.id.toLowerCase().includes(searchFilters.ticketId.toLowerCase())
-      );
-    }
-    if (searchFilters.category.trim()) {
-      filtered = filtered.filter(ticket => 
-        ticket.category.toLowerCase().includes(searchFilters.category.toLowerCase())
-      );
-    }
-    if (searchFilters.requester.trim()) {
-      filtered = filtered.filter(ticket => 
-        ticket.requester.toLowerCase().includes(searchFilters.requester.toLowerCase())
-      );
-    }
-    if (searchFilters.status !== 'all') {
-      filtered = filtered.filter(ticket => ticket.status === searchFilters.status);
-    }
-    setFilteredTickets([...filtered]);
+    if (searchFilters.ticketId.trim()) filtered = filtered.filter(t => t.id.toLowerCase().includes(searchFilters.ticketId.toLowerCase()));
+    if (searchFilters.category.trim()) filtered = filtered.filter(t => t.category.toLowerCase().includes(searchFilters.category.toLowerCase()));
+    if (searchFilters.requester.trim()) filtered = filtered.filter(t => t.requester.toLowerCase().includes(searchFilters.requester.toLowerCase()));
+    if (searchFilters.status !== 'all') filtered = filtered.filter(t => t.status === searchFilters.status);
+    setFilteredTickets(filtered);
     setSearchVisible(false);
   };
 
   const clearSearch = () => {
-    setSearchFilters({
-      ticketId: '',
-      category: '',
-      requester: '',
-      status: 'all'
-    });
-    setFilteredTickets([...tickets]);
+    setSearchFilters({ ticketId: '', category: '', requester: '', status: 'all' });
+    setFilteredTickets(tickets);
     setSearchVisible(false);
-  };
-
-  const getStatusColor = (status: TicketStatus) => {
-    switch (status) {
-      case 'completed':
-        return '#10b981';
-      case 'inProgress':
-        return '#f59e0b';
-      case 'pending':
-        return '#ef4444';
-      default:
-        return '#6b7280';
-    }
   };
 
   const getStatusText = (status: TicketStatus) => {
     switch (status) {
-      case 'completed':
-        return 'Completed';
-      case 'inProgress':
-        return 'In Progress';
-      case 'pending':
-        return 'Pending';
-      default:
-        return 'Unknown';
+      case 'completed': return 'Completed';
+      case 'inProgress': return 'In Progress';
+      case 'pending': return 'Pending';
+      default: return 'Unknown';
     }
   };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
-      case 'high':
-        return '#ef4444';
-      case 'medium':
-        return '#f59e0b';
-      case 'low':
-        return '#10b981';
-      default:
-        return '#6b7280';
+      case 'high': return '#ef4444';
+      case 'medium': return '#f59e0b';
+      case 'low': return '#10b981';
+      default: return '#6b7280';
     }
   };
 
-  const handleTicketPress = (ticket: Ticket) => {
-    Alert.alert('Ticket Selected', `Selected ticket: ${ticket.id}`);
-  };
-
-  const handleViewTicket = (ticket: Ticket) => {
-    Alert.alert(
-      'View Ticket Details',
-      `Ticket ID: ${ticket.id}\n` +
-      `Category: ${ticket.category}\n` +
-      `Status: ${getStatusText(ticket.status)}\n` +
-      `Priority: ${ticket.priority}\n` +
-      `Requester: ${ticket.requester}\n` +
-      `Space: ${ticket.space}\n` +
-      `Date: ${ticket.date}\n` +
-      `Details: ${ticket.details}`,
-      [
-        {
-          text: 'Close',
-          style: 'cancel'
-        },
-        {
-          text: 'Back',
-          onPress: () => {
-            console.log('Navigate to ticket details:', ticket);
-          }
-        }
-      ]
-    );
-  };
-
-  // const handleEditTicket = (ticket: Ticket) => {
-  //   Alert.alert(
-  //     'Edit Ticket',
-  //     `Edit ticket: ${ticket.id}`,
-  //     [
-  //       {
-  //         text: 'Cancel',
-  //         style: 'cancel'
-  //       },
-  //       {
-  //         text: 'Edit Details',
-  //         onPress: () => {
-  //           console.log('Navigate to edit ticket:', ticket);
-  //         }
-  //       },
-  //       {
-  //         text: 'Change Status',
-  //         onPress: () => handleChangeStatus(ticket)
-  //       }
-  //     ]
-  //   );
-  // };
-
-  // const handleChangeStatus = (ticket: Ticket) => {
-  //   const statusOptions: { label: string; value: TicketStatus }[] = [
-  //     { label: "Pending", value: "pending" },
-  //     { label: "In Progress", value: "inProgress" },
-  //     { label: "Completed", value: "completed" }
-  //   ];
-  //   const statusButtons = statusOptions
-  //     .filter(option => option.value !== ticket.status)
-  //     .map(option => ({
-  //       text: option.label,
-  //       onPress: () => updateTicketStatus(ticket, option.value)
-  //     }));
-  //   Alert.alert(
-  //     'Change Status',
-  //     `Current status: ${getStatusText(ticket.status)}\nSelect new status:`,
-  //     [
-  //       ...statusButtons,
-  //       { text: 'Cancel', style: 'cancel' }
-  //     ]
-  //   );
-  // };
-
-  // const updateTicketStatus = (ticket: Ticket, newStatus: TicketStatus) => {
-  //   const updatedTickets = tickets.map(t => 
-  //     t.id === ticket.id ? { ...t, status: newStatus } : t
-  //   );
-
-  //   setTickets([...updatedTickets]);
-  //   setFilteredTickets([...updatedTickets]);
-  //   setStats(calculateStats(updatedTickets));
-
-  //   Alert.alert(
-  //     "Status Updated",
-  //     `Ticket ${ticket.id} status changed to ${getStatusText(newStatus)}`
-  //   );
-  // };
-
-  const renderTicketCard = ({ item, index }: { item: Ticket; index: number }) => (
-    <TouchableOpacity
-      style={[styles.ticketCard, { marginBottom: index === filteredTickets.length - 1 ? 20 : 16 }]}
-      onPress={() => handleTicketPress(item)}
-      activeOpacity={0.7}
-    >
-      <View style={styles.ticketCardHeader}>
-        <View style={styles.ticketIdContainer}>
-          <Text style={styles.ticketIdText}>{item.id}</Text>
-          <View style={[styles.priorityDot, { backgroundColor: getPriorityColor(item.priority) }]} />
-        </View>
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) + '20' }]}>
-          <Text style={[styles.statusText, { color: getStatusColor(item.status) }]}>
-            {getStatusText(item.status)}
-          </Text>
-        </View>
+  const renderTicketCard = ({ item }: { item: Ticket }) => (
+    <View style={{
+      backgroundColor: '#fff',
+      borderRadius: 18,
+      marginBottom: 18,
+      padding: 18,
+      borderWidth: 1,
+      borderColor: '#dadada',
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.10,
+      shadowRadius: 8,
+      elevation: 3,
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    }}>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 18, fontWeight: '700', color: '#222', marginBottom: 4 }}>{item.item}</Text>
+        <Text style={{ fontSize: 14, color: '#555', marginBottom: 2 }}>
+          Unit: <Text style={{ fontWeight: '500', color: '#0891b2' }}>{item.space}</Text>
+        </Text>
+        <Text style={{ fontSize: 14, color: '#555', marginBottom: 2 }}>
+          Owner: <Text style={{ fontWeight: '500', color: '#146070' }}>{item.requester}</Text>
+        </Text>
+        <Text style={{ fontSize: 13, color: '#aaa', marginBottom: 2 }}>{item.date}</Text>
       </View>
-      <View style={styles.ticketCardContent}>
-        <Text style={styles.categoryTitle}>{item.category}</Text>
-        <Text style={styles.ticketDetails} numberOfLines={2}>{item.details}</Text>
-        
-        <View style={styles.ticketMetadata}>
-          <View style={styles.metadataItem}>
-            <Ionicons name="location-outline" size={14} color="#6b7280" />
-            <Text style={styles.metadataText}>{item.space}</Text>
-          </View>
-          <View style={styles.metadataItem}>
-            <Ionicons name="person-outline" size={14} color="#6b7280" />
-            <Text style={styles.metadataText}>{item.requester}</Text>
-          </View>
-          <View style={styles.metadataItem}>
-            <Ionicons name="calendar-outline" size={14} color="#6b7280" />
-            <Text style={styles.metadataText}>{item.date}</Text>
-          </View>
-        </View>
-      </View>
-      <View style={styles.ticketCardFooter}>
-        <TouchableOpacity 
-          style={styles.actionButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            handleViewTicket(item);
-          }}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="eye-outline" size={16} color="#146070" />
-          <Text style={[styles.actionButtonText, { color: '#146070' }]}>View</Text>
-        </TouchableOpacity>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // UPDATED: Empty State - shows different messages based on error vs no data
-  const EmptyState = () => (
-    <View style={styles.emptyContainer}>
-      <LinearGradient
-        colors={['#f8fafc', '#e2e8f0']}
-        style={styles.emptyIconContainer}
+      <TouchableOpacity
+        style={{
+          backgroundColor: '#e7faf2',
+          borderRadius: 8,
+          paddingVertical: 6,
+          paddingHorizontal: 18,
+          alignSelf: 'flex-start',
+        }}
+        onPress={() => {
+          setSelectedTicket(item);
+          setViewModalVisible(true);
+        }}
+        activeOpacity={0.75}
       >
-        <Ionicons name="document-text-outline" size={48} color="#94a3b8" />
-      </LinearGradient>
-      <Text style={styles.emptyTitle}>
-        {error ? 'Error Loading Tickets' : 'No Tickets Found'}
-      </Text>
-      <Text style={styles.emptySubtext}>
-        {error 
-          ? error
-          : "No help desk tickets are available at the moment."
-        }
-      </Text>
-      {error && (
-        <TouchableOpacity 
-          style={styles.retryButton}
-          onPress={() => fetchTickets(1)}
-        >
-          <LinearGradient
-            colors={['#146070', '#03C174']}
-            style={styles.retryButtonGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Ionicons name="refresh" size={20} color="#fff" />
-            <Text style={styles.retryButtonText}>Retry</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
-      {!error && (
-        <TouchableOpacity 
-          style={styles.createFirstTicketButton}
-          onPress={() => {
-            try {
-              navigation.navigate("CreateTicket" as never);
-            } catch (error) {
-              Alert.alert('Navigate', 'Navigate to Create Ticket page');
-            }
-          }}
-        >
-          <LinearGradient
-            colors={['#146070', '#03C174']}
-            style={styles.createFirstTicketGradient}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-          >
-            <Ionicons name="add" size={20} color="#fff" />
-            <Text style={styles.createFirstTicketText}>Create First Ticket</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      )}
+        <Text style={{ color: '#146070', fontWeight: '600', fontSize: 15 }}>View</Text>
+      </TouchableOpacity>
     </View>
   );
 
+  // SearchModal component as requested from your original code
   const SearchModal = () => (
     <Modal
       visible={searchVisible}
@@ -529,7 +286,7 @@ const HelpDesk = () => {
               <TextInput
                 style={styles.searchInput}
                 value={searchFilters.ticketId}
-                onChangeText={(text) => setSearchFilters({...searchFilters, ticketId: text})}
+                onChangeText={(text) => setSearchFilters({ ...searchFilters, ticketId: text })}
                 placeholder="Enter ticket ID"
                 placeholderTextColor="#9ca3af"
               />
@@ -539,7 +296,7 @@ const HelpDesk = () => {
               <TextInput
                 style={styles.searchInput}
                 value={searchFilters.category}
-                onChangeText={(text) => setSearchFilters({...searchFilters, category: text})}
+                onChangeText={(text) => setSearchFilters({ ...searchFilters, category: text })}
                 placeholder="Enter category"
                 placeholderTextColor="#9ca3af"
               />
@@ -549,7 +306,7 @@ const HelpDesk = () => {
               <TextInput
                 style={styles.searchInput}
                 value={searchFilters.requester}
-                onChangeText={(text) => setSearchFilters({...searchFilters, requester: text})}
+                onChangeText={(text) => setSearchFilters({ ...searchFilters, requester: text })}
                 placeholder="Enter requester name"
                 placeholderTextColor="#9ca3af"
               />
@@ -557,14 +314,14 @@ const HelpDesk = () => {
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Status</Text>
               <View style={styles.statusButtonsContainer}>
-                {['all', 'pending', 'inProgress', 'completed'].map((status) => (
+                {['all', 'pending', 'inProgress', 'completed'].map(status => (
                   <TouchableOpacity
                     key={status}
                     style={[
                       styles.statusFilterButton,
                       searchFilters.status === status && styles.statusFilterButtonActive
                     ]}
-                    onPress={() => setSearchFilters({...searchFilters, status})}
+                    onPress={() => setSearchFilters({ ...searchFilters, status })}
                   >
                     <Text style={[
                       styles.statusFilterText,
@@ -596,11 +353,85 @@ const HelpDesk = () => {
     </Modal>
   );
 
+  const ViewTicketModal = () => (
+    <Modal
+      visible={viewModalVisible}
+      animationType="slide"
+      transparent
+      onRequestClose={() => setViewModalVisible(false)}
+    >
+      <View style={{
+        flex: 1, backgroundColor: 'rgba(0,0,0,0.18)', justifyContent: 'center',
+        alignItems: 'center', padding: 20,
+      }}>
+        <View style={{
+          backgroundColor: '#fff', borderRadius: 18, width: '100%', maxWidth: 380,
+          padding: 24, shadowColor: '#146070', shadowOffset: { width: 0, height: 8 },
+          shadowOpacity: 0.12, shadowRadius: 24, elevation: 9,
+        }}>
+          <Text style={{
+            fontSize: 20, fontWeight: '700', marginBottom: 6, color: '#146070',
+            letterSpacing: 0.5
+          }}>{selectedTicket?.item || '-'}</Text>
+
+          <View style={{ marginBottom: 10, flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: '#222' }}>
+              Unit: <Text style={{ color: '#0891b2' }}>{selectedTicket?.space}</Text></Text>
+            <Text style={{ fontSize: 15, fontWeight: '600', color: '#222' }}>
+              Owner: <Text style={{ color: '#146070' }}>{selectedTicket?.requester}</Text></Text>
+          </View>
+          <Text style={{ fontSize: 13, color: '#6b7280', marginBottom: 8 }}>
+            Date: {selectedTicket?.date}
+          </Text>
+
+          <View style={{ height: 1, backgroundColor: '#e0e8f0', marginVertical: 10 }} />
+
+          <Text style={{ fontSize: 16, fontWeight: '600', color: '#222', marginBottom: 4 }}>
+            Category: <Text style={{ color: '#03C174' }}>{selectedTicket?.category}</Text>
+          </Text>
+
+          <Text style={{ fontSize: 15, color: '#444', marginBottom: 6 }}>
+            Details: <Text style={{ color: '#475569', fontWeight: '500' }}>{selectedTicket?.details}</Text>
+          </Text>
+
+          <Text style={{ fontSize: 14, color: '#586b7b', marginBottom: 6 }}>
+            Status: <Text style={{ color: '#146070', fontWeight: 'bold' }}>{getStatusText(selectedTicket?.status || 'pending')}</Text>
+          </Text>
+
+          <Text style={{ fontSize: 14, color: '#874c1b', marginBottom: 6 }}>
+            Priority: <Text style={{ color: getPriorityColor(selectedTicket?.priority || 'low'), fontWeight: 'bold' }}>{selectedTicket?.priority}</Text>
+          </Text>
+
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 18 }}>
+            <TouchableOpacity
+              onPress={() => setViewModalVisible(false)}
+              activeOpacity={0.8}
+              style={{
+                backgroundColor: '#03C174',
+                borderRadius: 8,
+                paddingHorizontal: 26,
+                paddingVertical: 12,
+                alignItems: 'center'
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700', fontSize: 16 }}>
+                Close
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  // Add your EmptyState component if you need it (unchanged from your code)
+  // For brevity, this example omits it but you can copy-paste from your original too.
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      
-      <ScrollView 
+
+      <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -619,8 +450,8 @@ const HelpDesk = () => {
         >
           <View style={styles.headerContent}>
             <View style={styles.headerLeft}>
-              <TouchableOpacity 
-                style={styles.backButton} 
+              <TouchableOpacity
+                style={styles.backButton}
                 onPress={handleBackPress}
                 activeOpacity={0.7}
               >
@@ -631,12 +462,12 @@ const HelpDesk = () => {
                 <Text style={styles.headerSubtitle}>Manage support tickets</Text>
               </View>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.newTicketButton}
               onPress={() => {
                 try {
                   navigation.navigate("CreateTicket" as never);
-                } catch (error) {
+                } catch {
                   Alert.alert('Navigate', 'Navigate to Create Ticket page');
                 }
               }}
@@ -672,7 +503,7 @@ const HelpDesk = () => {
                 <Text style={styles.statNumber}>{stats.total.toString().padStart(2, '0')}</Text>
                 <Text style={styles.statLabel}>Total</Text>
               </View>
-              
+
               <View style={styles.statItem}>
                 <LinearGradient
                   colors={['#10b981', '#059669']}
@@ -683,7 +514,7 @@ const HelpDesk = () => {
                 <Text style={styles.statNumber}>{stats.completed.toString().padStart(2, '0')}</Text>
                 <Text style={styles.statLabel}>Completed</Text>
               </View>
-              
+
               <View style={styles.statItem}>
                 <LinearGradient
                   colors={['#f59e0b', '#d97706']}
@@ -694,7 +525,7 @@ const HelpDesk = () => {
                 <Text style={styles.statNumber}>{stats.inProgress.toString().padStart(2, '0')}</Text>
                 <Text style={styles.statLabel}>In Progress</Text>
               </View>
-              
+
               <View style={styles.statItem}>
                 <LinearGradient
                   colors={['#ef4444', '#dc2626']}
@@ -731,12 +562,42 @@ const HelpDesk = () => {
           ) : (
             <View style={styles.ticketsContainer}>
               {filteredTickets.length === 0 ? (
-                <EmptyState />
+                <View style={styles.emptyContainer}>
+                  <LinearGradient colors={['#f8fafc', '#e2e8f0']} style={styles.emptyIconContainer}>
+                    <Ionicons name="document-text-outline" size={48} color="#94a3b8" />
+                  </LinearGradient>
+                  <Text style={styles.emptyTitle}>{error ? 'Error Loading Tickets' : 'No Tickets Found'}</Text>
+                  <Text style={styles.emptySubtext}>
+                    {error ? error : 'No help desk tickets are available at the moment.'}
+                  </Text>
+                  {error ? (
+                    <TouchableOpacity style={styles.retryButton} onPress={() => fetchTickets(1)}>
+                      <LinearGradient colors={['#146070', '#03C174']} style={styles.retryButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                        <Ionicons name="refresh" size={20} color="#fff" />
+                        <Text style={styles.retryButtonText}>Retry</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.createFirstTicketButton}
+                      onPress={() => {
+                        try {
+                          navigation.navigate("CreateTicket" as never);
+                        } catch {
+                          Alert.alert('Navigate', 'Navigate to Create Ticket page');
+                        }
+                      }}
+                    >
+                      <LinearGradient colors={['#146070', '#03C174']} style={styles.createFirstTicketGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+                        <Ionicons name="add" size={20} color="#fff" />
+                        <Text style={styles.createFirstTicketText}>Create First Ticket</Text>
+                      </LinearGradient>
+                    </TouchableOpacity>
+                  )}
+                </View>
               ) : (
-                filteredTickets.map((item, index) => (
-                  <View key={item.id}>
-                    {renderTicketCard({ item, index })}
-                  </View>
+                filteredTickets.map((item) => (
+                  <View key={item.id}>{renderTicketCard({ item })}</View>
                 ))
               )}
             </View>
@@ -745,20 +606,15 @@ const HelpDesk = () => {
       </ScrollView>
 
       <SearchModal />
+      <ViewTicketModal />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f1f5f9',
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  
-  // Header Styles
+  container: { flex: 1, backgroundColor: '#f1f5f9' },
+  scrollContainer: { flex: 1 },
+
   header: {
     paddingBottom: 10,
     borderBottomWidth: 1,
@@ -776,30 +632,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingTop: Platform.OS === 'ios' ? 10 : 20,
   },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
+  headerLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
   backButton: {
     padding: 8,
     marginRight: 16,
     borderRadius: 8,
     backgroundColor: 'rgba(20, 96, 112, 0.1)',
   },
-  titleContainer: {
-    flex: 1,
-  },
-  headerTitle: {
-    fontSize: 25,
-    fontWeight: '700',
-    color: '#146070',
-  },
-  headerSubtitle: {
-    fontSize: 14,
-    color: '#64748b',
-    marginTop: 2,
-  },
+  titleContainer: { flex: 1 },
+  headerTitle: { fontSize: 25, fontWeight: '700', color: '#146070' },
+  headerSubtitle: { fontSize: 14, color: '#64748b', marginTop: 2 },
   newTicketButton: {
     borderRadius: 12,
     overflow: 'hidden',
@@ -810,26 +652,19 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   },
   newTicketGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  buttonIcon: {
-    marginRight: 5,
-  },
-  newTicketText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  
-  // Stats Styles
-  statsContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 10,
-  },
+  flexDirection: 'row',
+  alignItems: 'center',
+  paddingHorizontal: 15, // reduced from 20
+  paddingVertical: 10,    // reduced from 12
+},
+
+buttonIcon: { marginRight: 4 }, // slightly smaller spacing
+newTicketText: { 
+  color: '#fff', 
+  fontWeight: '600', 
+  fontSize: 13, // reduced from 15
+},
+statsContainer: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 10 },
   statsCard: {
     borderRadius: 16,
     padding: 20,
@@ -841,14 +676,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  statsGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  statItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
+  statsGrid: { flexDirection: 'row', justifyContent: 'space-between' },
+  statItem: { alignItems: 'center', flex: 1 },
   statIconContainer: {
     width: 40,
     height: 40,
@@ -857,20 +686,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 8,
   },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: '#64748b',
-    fontWeight: '500',
-    textAlign: 'center',
-  },
+  statNumber: { fontSize: 24, fontWeight: '700', color: '#1e293b', marginBottom: 4 },
+  statLabel: { fontSize: 12, color: '#64748b', fontWeight: '500', textAlign: 'center' },
 
-  // Search Styles
   searchContainer: {
     marginHorizontal: 20,
     marginBottom: 20,
@@ -890,193 +708,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  searchIcon: {
-    marginRight: 12,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    color: '#64748b',
-    fontSize: 15,
-    fontWeight: '500',
-  },
+  searchIcon: { marginRight: 12 },
+  searchPlaceholder: { flex: 1, color: '#64748b', fontSize: 15, fontWeight: '500' },
 
-  // Content Styles
-  contentContainer: {
-    paddingHorizontal: 20,
-    minHeight: 200,
-  },
-  ticketsContainer: {
-    paddingBottom: 20,
-  },
+  contentContainer: { paddingHorizontal: 20, minHeight: 200 },
+  ticketsContainer: { paddingBottom: 20 },
 
-  // Ticket Card Styles
-  ticketCard: {
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 16,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  ticketCardHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  ticketIdContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ticketIdText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1e293b',
-    marginRight: 8,
-  },
-  priorityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  ticketCardContent: {
-    marginBottom: 16,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 4,
-  },
-  ticketDetails: {
-    fontSize: 14,
-    color: '#64748b',
-    lineHeight: 20,
-    marginBottom: 12,
-  },
-  ticketMetadata: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  metadataItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  metadataText: {
-    fontSize: 12,
-    color: '#6b7280',
-    marginLeft: 4,
-  },
-  ticketCardFooter: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: '#f1f5f9',
-    paddingTop: 12,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginLeft: 8,
-    borderRadius: 8,
-    backgroundColor: '#f8fafc',
-    borderWidth: 1,
-    borderColor: '#e2e8f0',
-  },
-  actionButtonText: {
-    fontSize: 12,
-    marginLeft: 4,
-    fontWeight: '600',
-  },
+  loadingContainer: { justifyContent: 'center', alignItems: 'center', paddingVertical: 60 },
+  loadingText: { marginTop: 16, color: '#64748b', fontSize: 16, fontWeight: '500' },
 
-  // Loading and Empty States
-  loadingContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 60,
-  },
-  loadingText: {
-    marginTop: 16,
-    color: '#64748b',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    paddingVertical: 60,
-    paddingHorizontal: 40,
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#1e293b',
-    marginBottom: 8,
-    textAlign: 'center',
-  },
-  emptySubtext: {
-    fontSize: 14,
-    color: '#64748b',
-    textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  createFirstTicketButton: {
-    borderRadius: 12,
-  },
-  createFirstTicketGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  createFirstTicketText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  // NEW: Retry Button Styles
-  retryButton: {
-    borderRadius: 12,
-    marginTop: 16,
-  },
-  retryButtonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  retryButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-
-  // Modal Styles
+  // Modal and Search Modal Styles
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -1104,28 +745,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     paddingVertical: 20,
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: '#fff',
-  },
-  closeButton: {
-    padding: 4,
-  },
-  searchForm: {
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    maxHeight: 400,
-  },
-  inputGroup: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 8,
-  },
+  modalTitle: { fontSize: 20, fontWeight: '700', color: '#fff' },
+  closeButton: { padding: 4 },
+  searchForm: { paddingHorizontal: 24, paddingTop: 20, maxHeight: 400 },
+  inputGroup: { marginBottom: 20 },
+  inputLabel: { fontSize: 14, fontWeight: '600', color: '#374151', marginBottom: 8 },
   searchInput: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -1136,11 +760,7 @@ const styles = StyleSheet.create({
     color: '#374151',
     backgroundColor: '#f9fafb',
   },
-  statusButtonsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
+  statusButtonsContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statusFilterButton: {
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -1149,24 +769,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e2e8f0',
   },
-  statusFilterButtonActive: {
-    backgroundColor: '#146070',
-    borderColor: '#146070',
-  },
-  statusFilterText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#64748b',
-  },
-  statusFilterTextActive: {
-    color: '#fff',
-  },
-  modalActions: {
-    flexDirection: 'row',
-    paddingHorizontal: 24,
-    paddingVertical: 24,
-    gap: 12,
-  },
+  statusFilterButtonActive: { backgroundColor: '#146070', borderColor: '#146070' },
+  statusFilterText: { fontSize: 12, fontWeight: '600', color: '#64748b' },
+  statusFilterTextActive: { color: '#fff' },
+  modalActions: { flexDirection: 'row', paddingHorizontal: 24, paddingVertical: 24, gap: 12 },
   clearButton: {
     flex: 1,
     paddingVertical: 14,
@@ -1176,27 +782,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f9fafb',
   },
-  clearButtonText: {
-    color: '#6b7280',
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  searchButton: {
-    flex: 1,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
+  clearButtonText: { color: '#6b7280', fontWeight: '600', fontSize: 16 },
+  searchButton: { flex: 1, borderRadius: 12, overflow: 'hidden' },
   searchButtonInner: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     paddingVertical: 14,
   },
-  searchButtonText: {
-    color: '#fff',
-    fontWeight: '600',
-    fontSize: 16,
+  searchButtonText: { color: '#fff', fontWeight: '600', fontSize: 16 },
+
+  emptyContainer: { alignItems: 'center', paddingVertical: 60, paddingHorizontal: 40 },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
   },
+  emptyTitle: { fontSize: 20, fontWeight: '600', color: '#1e293b', marginBottom: 8, textAlign: 'center' },
+  emptySubtext: { fontSize: 14, color: '#64748b', textAlign: 'center', lineHeight: 20, marginBottom: 24 },
+  createFirstTicketButton: { borderRadius: 12 },
+  createFirstTicketGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  createFirstTicketText: { color: '#fff', fontWeight: '600', marginLeft: 8 },
+  retryButton: { borderRadius: 12, marginTop: 16 },
+  retryButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  retryButtonText: { color: '#171616ff', fontWeight: '600', marginLeft: 8 },
 });
 
 export default HelpDesk;
